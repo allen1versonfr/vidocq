@@ -1,3 +1,9 @@
+# Validation for Vidocq 2.12.0
+
+182 automated tests cover existing features plus free-provider configuration, anonymous requests with no key forwarding, query/scoped filtering, cache isolation, rate/quota cooldowns, malformed/empty distinction, outages, optional Brave compatibility and removal of unrelated name-index fallback. The anonymous Mwmbl API returned live public Ada Lovelace results both from source and the actual Windows executable, with no API key/account. All five frontend scripts pass syntax checks. A direct DuckDuckGo HTML canary returned a challenge and was not adopted as an automatic provider. Visual browser checks were not repeated after the earlier access denial.
+
+Previous validation:
+
 # Validation for Vidocq 2.11.0
 
 170 automated tests pass. New lifecycle checks exercise the real installed Maigret companion without account queries: authenticated setup, repeat setup, child restart, stop on disable, manual-service switching and startup-error cleanup. The Windows bundle includes Maigret and its database/license. Local frozen checks passed automatic setup, repeat setup, authentication and shutdown without querying accounts. Source lifecycle tests also cover re-enablement and forced parent exit. Visual browser validation was not repeated; it remains unavailable after the prior browser approval denial.
