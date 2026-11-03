@@ -45,6 +45,13 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
                 if server.poll() is not None or time.monotonic()>=deadline:raise
                 time.sleep(.5)
         with request('/api/search-connection',{'key':'','enabled':False}) as response:assert not json.load(response)['configured']
+        with request('/local-ai.js') as response:assert b'Install recommended local AI' in response.read()
+        with request('/api/local-ai') as response:ai_status=json.load(response)
+        assert not ai_status['installed'] and not ai_status['enabled'] and not ai_status['running'] and ai_status['model_bytes']==2497280448
+        with request('/api/local-ai/licenses') as response:assert 'Apache' in json.load(response)['text']
+        try:request('/api/local-ai/setup',{'consent':False});raise AssertionError('AI setup accepted missing approval')
+        except urllib.error.HTTPError as error:assert error.code==400
+        assert not (root/'data'/'local-ai').exists(),'AI assets appeared without setup consent'
         for platform,url in [('instagram','https://www.instagram.com/example/'),('tiktok','https://www.tiktok.com/@example'),('vsco','https://vsco.co/example/gallery')]:
             with request('/api/research',{'kind':'auto','value':url}) as response:result=json.load(response)
             assert result['kind']==platform and result['social_profile']['handle']=='example'
@@ -250,6 +257,12 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
     finally:
         subprocess.run(['taskkill','/PID',str(server.pid),'/T','/F'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
         server.wait(timeout=20)
+    # App replacement/recovery must leave separately downloaded AI files/settings intact.
+    from local_ai_assets import MODEL
+    ai_fixture=root/'data'/'local-ai';ai_fixture.mkdir(exist_ok=True)
+    (ai_fixture/MODEL['filename']).write_bytes(b'synthetic model preservation fixture')
+    (root/'data'/'local-ai.json').write_text('{"enabled":false,"backend":"cpu"}')
+    ai_snapshots={p:hashlib.sha256(p.read_bytes()).hexdigest() for p in (ai_fixture/MODEL['filename'],root/'data'/'local-ai.json')}
     for scenario in ('success', 'rollback'):
         folder=root/scenario;folder.mkdir()
         target=folder/'Vidocq.exe';shutil.copyfile(exe,target)
@@ -267,6 +280,7 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
         assert process.returncode==(0 if scenario=='success' else 1), (scenario,process.returncode)
         assert json.loads(result.read_text())['status']==('updated' if scenario=='success' else 'failed')
         assert hashlib.sha256(target.read_bytes()).digest()==hashlib.sha256(exe.read_bytes()).digest()
+        assert all(hashlib.sha256(p.read_bytes()).hexdigest()==value for p,value in ai_snapshots.items()),'App update altered installed AI data/settings'
         deadline=time.monotonic()+90
         while not check.exists() and time.monotonic()<deadline:time.sleep(.5)
         assert check.exists(),f'{scenario}: restarted executable did not complete smoke test'

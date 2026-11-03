@@ -1,10 +1,10 @@
 # Local LLM assessment
 
-Implemented in 2.14: optional session-only loopback query selection and citation-validated extractive drafts. See [Discovery workbench](DISCOVERY_WORKBENCH.md) for the shipped behavior and setup. The broader proposals below remain design context; no model is bundled or downloaded.
+Implemented in 2.14: optional session-only loopback query selection and citation-validated extractive drafts. See [Discovery workbench](DISCOVERY_WORKBENCH.md) for the shipped behavior and setup. Since 2.15, [managed setup](LOCAL_AI_SETUP.md) can download the pinned model/runtime after approval. The broader proposals below remain historical design context.
 
 A small local model could improve query suggestions and evidence-linked summaries. It cannot supply missing search coverage, reveal private accounts, prove shared ownership from a handle or make blocked checks reliable. The real-world failures concerned parsing, query planning, source coverage and review state; deterministic fixes come first.
 
-This release does not bundle a model, start inference or download weights. Its features work without an LLM. Model size, memory/context requirements, latency and licensing need evaluation on the intended hardware before selecting a model.
+The initial 2.13/2.14 releases did not bundle a model, manage inference or download weights. Its features work without an LLM. Model size, memory/context requirements, latency and licensing need evaluation on the intended hardware before selecting a model.
 
 ## Proposed optional design
 
