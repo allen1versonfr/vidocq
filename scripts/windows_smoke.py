@@ -203,6 +203,12 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
         deadline=time.monotonic()+90
         while not check.exists() and time.monotonic()<deadline:time.sleep(.5)
         assert check.exists(),f'{scenario}: restarted executable did not complete smoke test'
-        # The child writes its marker just before exit; allow Windows to release the file.
-        time.sleep(2)
+        # The marker precedes process exit. Wait for the actual restarted
+        # executable/bootloader, especially with a larger bundled dependency set.
+        import psutil
+        target_path=str(target.resolve()).casefold()
+        for child in psutil.process_iter(['exe']):
+            if child.info['exe'] and str(Path(child.info['exe']).resolve()).casefold()==target_path:
+                try:child.wait(timeout=60)
+                except psutil.NoSuchProcess:pass
     print('Frozen imports/UI/database, executable replacement/restart, and failed-launch rollback passed.')
