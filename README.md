@@ -8,14 +8,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/allen1versonfr/test/releases/latest"><strong>Download Vidocq.exe</strong></a> ·
+  <a href="https://github.com/allen1versonfr/vidocq/releases/latest"><strong>Download Vidocq.exe</strong></a> ·
   <a href="docs/USER_GUIDE.md">User guide</a> ·
   <a href="docs/UPDATES.md">Updates &amp; recovery</a> ·
-  <a href="https://github.com/allen1versonfr/test/issues">Report an issue</a>
+  <a href="https://github.com/allen1versonfr/vidocq/issues">Report an issue</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/allen1versonfr/test/actions/workflows/windows.yml"><img src="https://github.com/allen1versonfr/test/actions/workflows/windows.yml/badge.svg" alt="Windows build and release status"></a>
+  <a href="https://github.com/allen1versonfr/vidocq/actions/workflows/windows.yml"><img src="https://github.com/allen1versonfr/vidocq/actions/workflows/windows.yml/badge.svg" alt="Windows build and release status"></a>
   <img src="https://img.shields.io/badge/platform-Windows_10%2F11_x64-172638?style=flat-square" alt="Windows 10/11 x64">
   <img src="https://img.shields.io/badge/interface-pywebview-d4b170?style=flat-square" alt="Python and pywebview interface">
 </p>
@@ -24,12 +24,14 @@
 
 Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-The current Windows release is **2.4.0**. Its 53 automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+The current Windows release is **2.5.0**. Its 72 automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
 
 ## What you can do
 
 | Workspace | What it offers |
 | --- | --- |
+| **Cases & reports** | Combine supplied identifiers and selected notebook evidence into persistent, cited report snapshots; export printable HTML, Markdown or JSON. |
+| **Phone** | Normalize numbers and inspect offline numbering-plan metadata without calling, messaging or identifying an owner. |
 | **Research** | Look up domains, public IPs, and topics through reviewed third-party indexes. Prepare username and email search queries. |
 | **Image search** | Search SauceNAO for possible image-source matches, with similarity scores and source references. |
 | **Notebook** | Save returned records or your own observations, add context and an evidence status, and export findings as JSON. |
@@ -50,6 +52,12 @@ The current Windows release is **2.4.0**. Its 53 automated tests and Windows exe
 
 Providers can return incomplete data, errors, or no results. A match is a lead to evaluate, not proof of identity or ownership.
 
+## From a few identifiers to a sourced report
+
+Use **Cases & reports** to supply names, usernames, emails, phones, domains, public IPs, reference URLs, notes and selected notebook findings together. Vidocq searches supported indexes, tracks failures and gaps, deduplicates exact records and produces a report with source citations. Names use Wikipedia and GDELT’s recent news index; phone analysis is offline. Email/username/phone browser searches are prepared links, not automatically retrieved discoveries. The app cannot establish identity or promise everything on the internet.
+
+[Case workflow, phone limits and report exports →](docs/CASES.md)
+
 ## Framework coverage
 
 The Source catalog includes the full OSINT Framework snapshot at upstream revision `08720d5b594cb7513d7ec81f8e70c400375a85fc`. Its default view includes 784 free, 249 freemium, and 7 mixed free/freemium entries. Thirty paid entries and 101 entries without pricing metadata are separated. Pricing and status labels come from upstream and can be outdated.
@@ -58,7 +66,7 @@ The Source catalog includes the full OSINT Framework snapshot at upstream revisi
 
 ## Get started
 
-1. Open the [latest release](https://github.com/allen1versonfr/test/releases/latest) and download **Vidocq.exe** under **Assets**. The source-code ZIP is for development.
+1. Open the [latest release](https://github.com/allen1versonfr/vidocq/releases/latest) and download **Vidocq.exe** under **Assets**. The source-code ZIP is for development.
 2. Put the executable in a writable folder, such as `Documents\Vidocq`, and run it. The release includes its Python runtime; you do not need to install Python.
 3. In **Research**, choose an input type or use Auto detect, enter a query, and select **Research**.
 4. Save useful records to **Notebook**, add your context, and export a copy when needed.
@@ -73,7 +81,7 @@ Vidocq checks for newer stable releases when it starts. In **Updates**, choose *
 
 > **First upgrade:** the original 2.2.1 executable has no updater. Replace it with the latest Vidocq.exe once. Subsequent supported releases can update inside the app.
 >
-> **Private repository:** this repository currently requires authenticated access. Enter a fine-grained GitHub token with **Contents: read** permission on `allen1versonfr/test` in the Updates tab. Vidocq keeps it in memory for that session. Public repositories do not need a token.
+> **Private repository:** this repository currently requires authenticated access. Enter a fine-grained GitHub token with **Contents: read** permission on `allen1versonfr/vidocq` in the Updates tab. Vidocq keeps it in memory for that session. Public repositories do not need a token.
 
 [Update setup, token handling, and recovery →](docs/UPDATES.md)
 
@@ -92,8 +100,8 @@ No cloud notebook sync or analytics are built in. The database is **not encrypte
 The app uses Python, a loopback HTTP backend, an HTML/CSS/JavaScript interface, pywebview, and SQLite. Windows releases are packaged as one executable with PyInstaller.
 
 ```powershell
-git clone https://github.com/allen1versonfr/test.git
-cd test
+git clone https://github.com/allen1versonfr/vidocq.git
+cd vidocq
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe app.py --browser
@@ -105,7 +113,7 @@ Repository access is required while the project is private. See [development and
 
 - [First steps, image search, notebook exports, and troubleshooting](docs/USER_GUIDE.md)
 - [Private-repository update setup and rollback](docs/UPDATES.md)
-- [Bug reports and feature requests](https://github.com/allen1versonfr/test/issues/new/choose)
+- [Bug reports and feature requests](https://github.com/allen1versonfr/vidocq/issues/new/choose)
 - [Changes in each documented version](CHANGELOG.md)
 
 When reporting a problem, include the app version, Windows version, and steps to reproduce it. Remove tokens, API keys, personal queries, and sensitive findings from screenshots and logs.
