@@ -1,13 +1,14 @@
-## Vidocq 2.5.1 — Search results and diagnostics
+## Vidocq 2.6.0 — Social profiles and Windows identity
 
-- Fixed Auto detect treating full names as usernames.
-- Added an optional Brave Search API connection to retrieve actual indexed snippets for names, usernames, emails and phone numbers, including case reports. Original result pages are never fetched.
-- Added clear disconnected, failed, incomplete and no-match outcomes in research, case reports and exports. Offline phone metadata is not counted as an online search.
-- Added Search connection settings and public Wikipedia/RDAP health checks. Keys remain in memory, are sent only to the fixed API endpoint, and are never included in reports. Redirects are blocked. Requests are capped at 100 per app session.
-- Reject malformed encyclopedia/registry/search responses instead of showing false empty results.
-- Added a live public-index canary gate before the Windows build and release.
+- Added Instagram, TikTok and VSCO input types in Research, including automatic detection of full profile URLs.
+- Added separate platform fields in Cases & reports, normalized and deduplicated handles, saved profile context, per-platform source coverage and canonical supplied profile references in HTML/Markdown/JSON exports.
+- VSCO accepts profile URLs ending in `/gallery` and handles with dashes. Short links, post/video URLs, unexpected hosts and unsafe URL forms are rejected without being visited.
+- An enabled Brave Search API connection retrieves platform-scoped index snippets. Without your own key, prepared Google/Bing/DuckDuckGo queries remain available and no completed online search is claimed. No profile or media pages are fetched, no account is contacted and no ownership is inferred.
+- Existing saved cases load with empty social fields; historical report snapshots remain unchanged. Up to five handles per platform count toward the fifteen-input case limit.
+- Added an original navy/gold Vidocq magnifier icon, embedded as nine Windows ICO sizes in the executable, plus a matching app mark and browser icon. Stable taskbar grouping uses Vidocq.Desktop. The standalone ICO is included as a release asset.
 
-### Set up general web search
-Open **Search connection**, enter your own Brave Search API key, enable it, then rerun research or generate a new report. Brave requires signup and a payment card. Its current $5 monthly credits are limited; check provider pricing and usage. This optional integration is not unlimited free search. No account or key is included. Without it, Wikipedia/news/registry adapters still work where applicable; email/username/phone web searches remain prepared links.
+### Use it
+Update to 2.6.0. Choose Instagram, TikTok or VSCO in Research, or paste a full profile URL with Auto detect. For a combined report, add the profiles to their separate case fields, save and generate a new snapshot. Enable your own Brave key in Search connection for automatic indexed retrieval; provider limits and charges may apply.
 
-83 automated tests, frontend syntax, live public canaries and actual Windows executable/report/updater checks gate publication. Brave response/error/security tests use mocked responses; no live Brave request was tested because no user API key was supplied. Matching index mentions do not verify identity or phone ownership. Source outages and incomplete indexing remain possible.
+### Validation and limits
+98 automated tests cover profile input validation, URL normalization, query scoping, index-only requests, rejected unsafe links, disconnected states, case persistence/compatibility, exports and icon sizes. Live public Wikipedia/RDAP canaries and actual frozen Windows social/phone/case/report/export and updater recovery checks gate publication. Windows also verifies that the executable contains the exact generated Vidocq icon frames. Brave result parsing is tested with mocked responses; no live Brave request was run without a user key. Index coverage is incomplete and cannot establish identity, account availability or ownership.
