@@ -1,0 +1,33 @@
+name: Publish Vidocq executable
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-vidocq.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct and verify original executable
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, pathlib
+          parts = sorted(pathlib.Path('.release-payload').glob('part-*.b64'))
+          assert len(parts) == 30, f'Expected 30 parts, got {len(parts)}'
+          data = b''.join(base64.b64decode(p.read_text(), validate=True) for p in parts)
+          assert len(data) == 15196439, f'Unexpected size: {len(data)}'
+          digest = hashlib.sha256(data).hexdigest()
+          assert digest == '6853cb077f00946a4d90a45076e1f6dee9011358720cc2984c7488aa9e326bd3', digest
+          pathlib.Path('Vidocq.exe').write_bytes(data)
+          print(f'Verified Vidocq.exe: {len(data)} bytes; SHA-256 {digest}')
+          PY
+      - name: Attach executable and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release upload untagged-238e11ac0d845ed8bd8c Vidocq.exe --clobber
+          gh release edit untagged-238e11ac0d845ed8bd8c --tag vidocq-windows --title "Vidocq for Windows" --notes "Download Vidocq.exe below. Original executable verified by size and SHA-256 before upload." --draft=false --latest
