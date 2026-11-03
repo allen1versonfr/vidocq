@@ -24,7 +24,10 @@ else:
     gh('release','create',tag,'--draft','--target','main','--title','Vidocq '+VERSION,'--notes-file',str(notes))
 gh('release','upload',tag,str(exe),'dist/SHA256SUMS.txt','dist/BUILD_INFO.json','--clobber')
 for attempt in range(12):
-    assets=json.loads(gh('api','repos/{owner}/{repo}/releases/tags/'+tag))['assets']
+    releases=json.loads(gh('api','repos/{owner}/{repo}/releases?per_page=100'))
+    matching=[r for r in releases if r['tag_name']==tag]
+    assert len(matching)==1, 'Cannot resolve release draft.'
+    assets=matching[0]['assets']
     matched=[a for a in assets if a['name']=='Vidocq.exe']
     if len(matched)==1 and matched[0].get('digest')=='sha256:'+digest and matched[0]['size']==len(data):break
     time.sleep(5)
