@@ -4,7 +4,7 @@
 
 ## First upgrade
 
-The original portable executable is version 2.2.1 and does not contain an updater. Close it, download the current **Vidocq.exe** from [Releases](https://github.com/allen1versonfr/test/releases/latest), and replace the old executable once. Keep it in a writable folder. Notebook data is stored separately, so replacing the EXE does not remove findings.
+The original portable executable is version 2.2.1 and does not contain an updater. Close it, download the current **Vidocq.exe** from [Releases](https://github.com/allen1versonfr/vidocq/releases/latest), and replace the old executable once. Keep it in a writable folder. Notebook data is stored separately, so replacing the EXE does not remove findings.
 
 ## Updating from Vidocq
 
@@ -17,7 +17,7 @@ The updater accepts newer stable semantic versions such as `v2.4.0`. It rejects 
 
 ## Access to this private repository
 
-Use a fine-grained GitHub personal access token scoped to `allen1versonfr/test`, with **Contents: read** permission. The token must belong to an account with access to this repository. Enter it only in Vidocq’s Updates field. Never paste it into an issue, source file, screenshot, or pull request.
+Use a fine-grained GitHub personal access token scoped to `allen1versonfr/vidocq`, with **Contents: read** permission. The token must belong to an account with access to this repository. Enter it only in Vidocq’s Updates field. Never paste it into an issue, source file, screenshot, or pull request.
 
 Vidocq retains a token entered in the app only in memory for the session. It sends the token only to `api.github.com`; authorization is stripped before following a download redirect to GitHub’s allowed download hosts. The token is not written into update-job files or the notebook.
 
