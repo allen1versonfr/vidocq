@@ -4,7 +4,7 @@ Start with the [development guide](docs/DEVELOPMENT.md) and the [data and privac
 
 ## Report a bug
 
-Use the bug-report form under [Issues](https://github.com/allen1versonfr/test/issues/new/choose). Include your Vidocq version, Windows version, exact steps, expected result, and actual result. For startup problems, attach a redacted excerpt of `startup.log` if useful. Never attach tokens, API keys, private findings, or unredacted personal queries.
+Use the bug-report form under [Issues](https://github.com/allen1versonfr/vidocq/issues/new/choose). Include your Vidocq version, Windows version, exact steps, expected result, and actual result. For startup problems, attach a redacted excerpt of `startup.log` if useful. Never attach tokens, API keys, private findings, or unredacted personal queries.
 
 ## Suggest a feature
 
