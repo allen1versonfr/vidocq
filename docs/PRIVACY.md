@@ -11,6 +11,7 @@
 | Text queries | Not automatically saved as findings. Saving a returned record includes query context in the finding. |
 | JSON exports | Written where your browser or native download dialog saves them; contain saved findings and source references. |
 | Image files and SauceNAO keys | Not intentionally persisted by the app. Image-search source references can be saved as notebook findings. |
+| Brave Search API key | Held in process memory only; optional `VIDOCQ_BRAVE_API_KEY` environment variable is managed by you. Sent only to the fixed Brave API host, never included in cases/reports. |
 | GitHub token entered in Updates | Kept in process memory for the session; not written into the notebook or update jobs. |
 | `VIDOCQ_GITHUB_TOKEN` | Optional OS environment variable managed by you; persistent storage, if configured, is outside the app. |
 | Diagnostics | `startup.log` and `update-result.json` in the data folder. Review before sharing. |
@@ -25,6 +26,8 @@ There is no built-in notebook cloud sync or analytics. The default data director
 | Domain research | Internet Archive and crt.sh receive the submitted domain. |
 | IP research | The reviewed registry endpoint receives the submitted public IP. |
 | Name / case research | Wikipedia receives the name; GDELT receives an exact-phrase name query against its recent news index. No original article is fetched. |
+| Optional general web search | When enabled with your key, Brave receives exact-phrase name, username, email or phone queries, including case inputs. Only API snippets are retrieved; no original page or thumbnail is fetched. |
+| Public source health check | Wikipedia receives Ada Lovelace and ARIN receives 8.8.8.8; no case details are sent. |
 | Phone analysis | Offline metadata only; no calls, texts or owner/account checks. Prepared search URLs include the number, but are not automatically opened. |
 | Topic research | Wikipedia receives the search term. |
 | Prepared browser search | The chosen search/index provider receives the query when you open it. |
