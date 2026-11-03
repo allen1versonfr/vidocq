@@ -158,6 +158,22 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
             print('Frozen authenticated HarvestView and Maigret synthetic lookups passed.')
         finally:extra_fixture.shutdown();extra_fixture.server_close()
 
+        # Start the real bundled library without checking any public account.
+        with request('/api/collectors/maigret/setup',{}) as response:auto=json.load(response)
+        assert auto['managed_maigret']['running'] and auto['maigret']['enabled'] and auto['maigret']['configured']
+        managed_port=auto['maigret']['port']
+        with request('/api/collectors/maigret/setup',{}) as response:again=json.load(response)
+        assert again['maigret']['port']==managed_port
+        try:
+            urllib.request.urlopen('http://127.0.0.1:'+str(managed_port)+'/api/about',timeout=5)
+            raise AssertionError('Bundled companion allowed unauthenticated access')
+        except urllib.error.HTTPError as error:assert error.code==403
+        with request('/api/collectors',{'maigret_enabled':False}) as response:assert not json.load(response)['managed_maigret']['running']
+        try:
+            urllib.request.urlopen('http://127.0.0.1:'+str(managed_port)+'/api/about',timeout=2)
+            raise AssertionError('Disabled bundled companion still running')
+        except urllib.error.URLError:pass
+        print('Actual bundled Maigret automatic setup, repeat setup, authentication and shutdown passed without account queries.')
         with request('/api/workspace/backup',{'password':'synthetic backup password'}) as response:bundle=json.load(response)
         assert bundle['encrypted']
         with request('/api/workspace/restore',dict(bundle,password='synthetic backup password')) as response:preview=json.load(response)

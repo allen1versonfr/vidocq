@@ -57,3 +57,7 @@ JSON imports preserve original files and records locally. No SpiderFoot server, 
 Confirmed automatic runs can send discovered identifiers to the existing index providers within selected limits; name/employer/location context can be combined in Brave queries. The complete notes/documents are not sent. Opt-in Steam requests go to Valve, optionally CBL; its key stays in Vidocq memory and is excluded from stored/exported source references. The Osintgram bridge sends only the selected Instagram handle and fixed bounded commands to a user-configured loopback port. Osintgram's backend handles its credentials, billing and platform access, which can involve HikerAPI or Instagram. No remote media is loaded by Vidocq.
 
 These connectors require both session enablement and per-case permission. They go beyond third-party-index-only collection. Logs, charges, access restrictions and platform visibility are provider-dependent. Case snapshots retain discovered clues, citations and non-secret connector settings; local SQLite remains unencrypted. See [the setup and privacy details](AUTOMATIC_INVESTIGATIONS.md).
+
+## Included Maigret service
+
+The setup button starts bundled Maigret locally without installing software, downloading a runtime or querying accounts. Vidocq chooses a loopback port and keeps its generated key in memory. The service stops on disable/app exit. Each case still needs permission before selected public platforms receive a supplied handle. Advanced manual-service settings remain available.

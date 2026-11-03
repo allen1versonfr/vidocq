@@ -24,7 +24,7 @@
 
 Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-The current Windows release is **2.10.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+The current Windows release is **2.11.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
 
 ## Automatic investigations with Steam and Osintgram
 
@@ -32,7 +32,7 @@ Enter known identifiers and context, set search/depth limits, and generate a rep
 
 ## Additional collectors
 
-Optional HIBP email breach metadata, passive theHarvester domain research and selected-site Maigret username checks now feed case reports. Each requires setup and a case permission. HIBP needs your subscription key; theHarvester and Maigret need separate local services. [Setup and limits](docs/ADDITIONAL_COLLECTORS.md).
+Optional HIBP email breach metadata, passive theHarvester domain research and selected-site Maigret username checks now feed case reports. Each requires setup and a case permission. HIBP needs your subscription key; theHarvester needs a separate local service; Maigret is included and starts with the setup button. [Setup and limits](docs/ADDITIONAL_COLLECTORS.md).
 
 ## SpiderFoot import
 
