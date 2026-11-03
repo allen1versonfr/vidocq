@@ -2,6 +2,14 @@
 
 Changes documented from the releases created for this repository.
 
+## 2.5.1 — 2026-11-03
+
+- Fixed full-name auto detection and misleading zero-result outcomes.
+- Added optional Brave web-index retrieval and in-memory key configuration for names, usernames, emails and phones.
+- Preserved phone web-index findings in case reports and exposed search outcomes in exports.
+- Added public source diagnostics, malformed-response checks, API limits, redirect/key safety tests and live canaries before release.
+- 83 automated tests; live Brave integration requires a user key and was not exercised.
+
 ## 2.5.0 — 2026-11-03
 
 - Added offline international phone parsing, numbering-plan validation and allocation/type/carrier metadata, with explicit owner/location limitations.
