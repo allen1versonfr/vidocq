@@ -1,3 +1,7 @@
+# 2.10.0
+
+Added optional HIBP, passive HarvestView and scoped Maigret companion connections, case integration, attributed exports, cancellation and partial coverage. See docs/ADDITIONAL_COLLECTORS.md.
+
 # 2.9.0 — Automatic investigations and profile connectors
 
 - Add a bounded identifiers-to-report engine with queue/depth/follow-up limits, explicit clue extraction, relevance checks and parent citations.

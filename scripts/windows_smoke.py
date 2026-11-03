@@ -119,6 +119,45 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
             with request('/assisted.js') as response:assert response.status==200
             print('Frozen assisted investigation, Osintgram bridge, derived-clue budget, Steam configuration gaps and cited summary passed.')
         finally:fixture.shutdown();fixture.server_close()
+        with request('/collectors.js') as response:assert b'case-allow-hibp' in response.read()
+        with request('/api/collectors') as response:collector_status=json.load(response)
+        assert all(not collector_status[k]['enabled'] for k in ('hibp','harvester','maigret'))
+        with request('/api/cases',{'title':'Additional collector gaps','emails':['sample@example.com'],'domains':['example.com'],'usernames':['sample'],'investigation':{'enabled':True,'allow_hibp':True,'allow_harvester':True,'allow_maigret':True,'max_searches':3,'max_followups':0}}) as response:extra_case=json.load(response)
+        with request('/api/cases/'+extra_case['id']+'/run',{'consent':True}) as response:extra_run=json.load(response)
+        deadline=time.monotonic()+30
+        while True:
+            with request('/api/case-runs/'+extra_run['id']) as response:extra_report=json.load(response)
+            if extra_report['status']=='complete':break
+            assert extra_report['status'] in ('queued','running') and time.monotonic()<deadline,extra_report
+            time.sleep(.1)
+        assert all(any(name.lower() in c['provider'].lower() and c['status']=='not-configured' for c in extra_report['coverage']) for name in ('Have I Been Pwned','theHarvester','Maigret')),extra_report['coverage']
+        print('Frozen additional collector asset, default-off configuration and missing-connection coverage passed.')
+        class CollectorFixture(OsintgramFixture):
+            def do_GET(self):
+                assert self.headers.get('X-API-Key')=='synthetic-collector-key' or self.headers.get('X-Vidocq-Key')=='synthetic-collector-key'
+                if self.path=='/api/v1/sources':return self.reply({'sources':[{'name':'crtsh','activity':'P0','ready':True}]})
+                assert self.path=='/api/about'
+                self.reply({'service':'vidocq-maigret-bridge','protocol':1})
+            def do_POST(self):
+                p=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                if self.path=='/api/v1/runs':
+                    assert p['target']=='example.com' and p['sources']==['crtsh'] and not p['dns_resolve']
+                    return self.reply({'run_id':'fixture-1','target':'example.com','sources':['crtsh'],'activities':['P0'],'status':'completed','evidence_status':'complete','results':[{'type':'hostname','value':'sub.example.com','sources':['crtsh']}]})
+                assert self.path=='/api/search' and p['username']=='synthetic' and p['sites']==['GitHub']
+                self.reply({'username':'synthetic','results':[{'site':'GitHub','status':'Claimed','url':'https://github.com/synthetic'}]})
+        extra_fixture=ThreadingHTTPServer(('127.0.0.1',0),CollectorFixture);threading.Thread(target=extra_fixture.serve_forever,daemon=True).start()
+        try:
+            settings={k+'_enabled':True for k in ('harvester','maigret')}
+            settings.update({k+'_key':'synthetic-collector-key' for k in ('harvester','maigret')})
+            settings.update({k+'_port':extra_fixture.server_port for k in ('harvester','maigret')})
+            with request('/api/collectors',settings) as response:assert json.load(response)['maigret']['enabled']
+            for kind,value,choices in [('harvester','example.com',{'sources':['crtsh']}),('maigret','synthetic',{'sites':['GitHub']})]:
+                with request('/api/collectors/lookup',dict(kind=kind,value=value,consent=True,**choices)) as response:lookup=json.load(response)
+                assert lookup['results'][0]['status']=='ok' and lookup['results'][0]['rows'][0]['lead_only']
+            with request('/api/collectors',{'harvester_enabled':False,'maigret_enabled':False,'harvester_key':'','maigret_key':''}) as response:assert not json.load(response)['maigret']['configured']
+            print('Frozen authenticated HarvestView and Maigret synthetic lookups passed.')
+        finally:extra_fixture.shutdown();extra_fixture.server_close()
+
         with request('/api/workspace/backup',{'password':'synthetic backup password'}) as response:bundle=json.load(response)
         assert bundle['encrypted']
         with request('/api/workspace/restore',dict(bundle,password='synthetic backup password')) as response:preview=json.load(response)

@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 
 from research_connectors import normalize_steam
 from social_profiles import detect_platform, normalize_profile, profile_reference
+from collector_policy import HARVESTER_SOURCES,MAIGRET_SITES,DEFAULT_MAIGRET_SITES,selected
 
 KINDS={'names':'person','usernames':'username','emails':'email','phones':'phone','domains':'domain','ips':'ip','instagram':'instagram','tiktok':'tiktok','vsco':'vsco','steam':'steam'}
 COMMANDS=('get_user_info','get_account_about','get_captions','get_hashtags')
@@ -34,7 +35,7 @@ def options(value):
     if value is None:value={}
     if not isinstance(value,dict):raise ValueError('Invalid investigation settings.')
     result={}
-    for field,default in [('enabled',False),('follow_clues',True),('direct_sources',False)]:
+    for field,default in [('enabled',False),('follow_clues',True),('direct_sources',False),('allow_hibp',False),('allow_harvester',False),('allow_maigret',False)]:
         result[field]=value.get(field,default)
         if type(result[field]) is not bool:raise ValueError('Invalid investigation setting: '+field)
     for field,default,low,high in [('max_searches',25,1,40),('max_followups',5,0,10),('depth',1,0,2)]:
@@ -48,6 +49,8 @@ def options(value):
     if app_id in ('',None):app_id=None
     if app_id is not None and (type(app_id) is not int or not 1<=app_id<=2147483647):raise ValueError('Enter a valid numeric Steam game AppID.')
     result['steam_app_id']=app_id
+    result['harvester_sources']=selected(value.get('harvester_sources',['crtsh','certspotter']),HARVESTER_SOURCES,4)
+    result['maigret_sites']=selected(value.get('maigret_sites',DEFAULT_MAIGRET_SITES),MAIGRET_SITES,10)
     return result
 
 def token_match(value,blob):
@@ -103,6 +106,7 @@ def synthesis(run):
         r=record.get('relevance',{})
         bucket='stronger_leads' if len(r.get('matched_identifiers',[]))>=2 else 'needs_review' if r.get('matched_identifiers') else 'unlinked_results'
         if record.get('analyst_status')=='Rejected':bucket='rejected_evidence'
+        elif record.get('lead_only'):bucket='needs_review'
         grouped[bucket].append({'citation':record['id'],'title':record['title'],'reason':r.get('label','Supplied or offline context; not independently verified.'),'matched_identifiers':r.get('matched_identifiers',[])})
         reported=record.get('observations',{}).get('reported_name')
         names=run['case'].get('names',[])
@@ -121,7 +125,7 @@ def execute(service,run):
     from case_reports import now, safe_reference
     from web_search import outcome
     case=run['case'];opts=options(case.get('investigation'));queue=deque();seen=set();records={};followups=0
-    cancelled=service.cancel_flags[run['id']]
+    cancelled=service.cancel_flags[run['id']];collector_attempts=set()
     run.update(status='running',completed=0,total=0,message='Building the investigation plan…',discovered_clues=[],search_log=[],discovery_links=[])
     def enqueue(kind,value,depth=0,parent=None,origin='supplied'):
         identity=(kind,json.dumps(value,sort_keys=True).casefold())
@@ -152,6 +156,8 @@ def execute(service,run):
                'matched_inputs':[seed],'retrieved_at':now(),'origin':origin,'identity_status':'Unverified relevance',
                'parent_citations':[task['parent_citation']] if task.get('parent_citation') else [],'search_depth':task['depth']}
         if isinstance(row.get('observations'),dict):entry['observations']=row['observations']
+        if row.get('lead_only'):entry['lead_only']=True
+        if isinstance(row.get('attribution'),dict):entry['attribution']=row['attribution']
         entry['relevance']=relevance(case,entry);records[fingerprint]=entry
         return entry
     for finding in run['supplied_findings']:
@@ -172,11 +178,25 @@ def execute(service,run):
                 if service.connectors is None:raise ValueError('Enable the relevant connector before direct source research.')
                 reports.append(service.connectors.steam(value,opts['steam_app_id']) if kind=='steam' else service.connectors.osintgram(value,run['id'],opts['osintgram_commands']))
             except ValueError as error:reports.append({'results':[{'provider':'Steam connector' if kind=='steam' else 'Osintgram connector','status':'not-configured' if 'enable' in str(error).lower() else 'error','message':str(error),'rows':[]}],'links':[]})
+        jobs=[]
+        if opts['allow_hibp'] and kind=='email' and value.casefold() in {e.casefold() for e in case.get('emails',[])}:jobs.append(('Have I Been Pwned',lambda:service.collectors.hibp(value),'hibp:'+value.casefold()))
+        if opts['allow_harvester'] and kind=='domain' and any(value==d or value.endswith('.'+d) for d in case.get('domains',[])):jobs.append(('theHarvester',lambda:service.collectors.harvester(value,run['id'],opts['harvester_sources']),'harvester:'+value))
+        if opts['allow_maigret'] and kind in ('username','instagram','tiktok','vsco') and task['depth']==0:jobs.append(('Maigret',lambda:service.collectors.maigret(value,run['id'],opts['maigret_sites']),'maigret:'+value.lstrip('@').casefold()))
+        for provider,call,identity in jobs:
+            if cancelled.is_set() or identity in collector_attempts:continue
+            collector_attempts.add(identity)
+            try:
+                if service.collectors is None:raise ValueError('Collector not configured: enable this source in Search connection.')
+                reports.append(call())
+            except ValueError as error:reports.append({'results':[{'provider':provider,'status':'not-configured' if 'not configured' in str(error) else 'error','message':str(error),'rows':[]}],'links':[]})
         for report in reports:
             run['prepared_searches'].extend(dict(link,seed=seed,executed=False) for link in report.get('links',[]))
             if not report.get('results'):run['coverage'].append({'seed':seed,'provider':'Index research','status':'not-run','count':0,'message':'No connected source ran for this identifier.'})
             for provider in report.get('results',[]):
                 rows=provider.get('rows',[]);label=provider.get('provider','Research source')
+                if label=='Have I Been Pwned':
+                    from additional_collectors import HIBP_ATTRIBUTION
+                    run['attributions']=[HIBP_ATTRIBUTION]
                 run['coverage'].append({'seed':seed,'provider':label,'status':provider.get('status','error'),'count':len(rows),'source':provider.get('source',''),'message':provider.get('message','')})
                 for row in rows:
                     origin='offline-metadata' if label=='Offline phone metadata' else 'retrieved'
@@ -187,14 +207,14 @@ def execute(service,run):
                         if field and relevance({field:[value]},entry)['matched_identifiers']:
                             entry['relevance']['can_expand']=True
                             entry['relevance']['supported_chain_identifier']=kind+': '+value
-                    if not opts['follow_clues'] or task['depth']>=opts['depth'] or origin!='retrieved' or label=='Community Ban List':continue
+                    if not opts['follow_clues'] or task['depth']>=opts['depth'] or origin!='retrieved' or label in ('Community Ban List','Have I Been Pwned'):continue
                     ref=entry['reference']
                     reference_clue=ref if detect_platform(ref) or urlparse(ref).hostname in ('steamcommunity.com','www.steamcommunity.com') else ''
                     clues=extract_clues(entry['title']+'\n'+entry['detail']+'\n'+reference_clue,service.normalize)
                     for clue in clues:
                         identity=(clue['kind'],json.dumps(clue['value'],sort_keys=True).casefold())
                         if identity in seen:continue
-                        permitted=entry['relevance']['can_expand'] or (opts['direct_sources'] and label.startswith(('Steam public profile','Osintgram / get_user_info')))
+                        permitted=not entry.get('lead_only') and (entry['relevance']['can_expand'] or (opts['direct_sources'] and label.startswith(('Steam public profile','Osintgram / get_user_info'))))
                         scheduled=permitted and followups<opts['max_followups'] and run['completed']+len(queue)+1<opts['max_searches'] and not cancelled.is_set()
                         reason='Queued within limits' if scheduled else 'Cancelled before follow-up' if cancelled.is_set() else 'Uncertain relevance — manual review required' if not permitted else 'Follow-up budget reached'
                         clue=dict(clue,parent_citation=entry['id'],depth=task['depth']+1,status='queued' if scheduled else 'not-searched',reason=reason)
