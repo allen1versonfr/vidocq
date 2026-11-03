@@ -1,5 +1,6 @@
 """Bounded, deterministic clue following and evidence-linked report synthesis."""
 from collections import deque
+from discovery_review import profile_handle,PROFILE_HOSTS,locations,apply_decision,rejected,rejected_sites
 import hashlib
 import json
 import re
@@ -21,6 +22,7 @@ def report_sections(run):
     sections.append(('Differences and contradictions to review',['['+x['citation']+'] '+x['message'] for x in analysis.get('review_flags',[])] or ['No explicit profile-name differences detected. This is not a comprehensive contradiction check.']))
     sections.append(('Discovered clues and follow-up trail',[(x['kind']+': '+x['value']+' · from ['+x['parent_citation']+'] · '+x['status']+' · '+x['reason']) for x in run.get('discovered_clues',[])] or ['No additional explicit identifiers discovered.']))
     sections.append(('Search gaps',[x.get('input','')+' · '+x.get('provider','')+' · '+x.get('status','')+' · '+x.get('message','') for x in analysis.get('coverage_gaps',[])] + ['Unsearched: '+json.dumps(x,ensure_ascii=False) for x in run.get('search_log',[]) if x['status']=='not-run'] or ['No logged source failures or unsearched inputs. Coverage still depends on selected providers.']))
+    sections.append(('Platform check diagnostics',[c.get('seed','')+' · '+x.get('site','')+' · '+x.get('outcome','unknown')+' · '+x.get('reason','') for c in run.get('coverage',[]) for x in c.get('checks',[])] or ['No per-site checks recorded.']))
     sections.append(('Unanswered questions',analysis['unanswered']))
     return sections
 
@@ -95,7 +97,8 @@ def extract_clues(blob,normalize):
         platform=detect_platform(url)
         if platform:add(platform,url)
         elif urlparse(url).hostname in ('steamcommunity.com','www.steamcommunity.com'):add('steam',url)
-        elif urlparse(url).hostname:add('domain',urlparse(url).hostname)
+        elif profile_handle(url):add('username',profile_handle(url))
+        elif urlparse(url).hostname and urlparse(url).hostname.removeprefix('www.') not in PROFILE_HOSTS:add('domain',urlparse(url).hostname)
     return found[:30]
 
 def synthesis(run):
@@ -114,9 +117,12 @@ def synthesis(run):
             flags.append({'citation':record['id'],'message':'Reported profile name differs from supplied names: '+reported[:200]+'. This may be an alias or an unrelated account; review before attributing it.'})
     gaps=[{'input':c.get('seed',''),'provider':c.get('provider',''),'status':c.get('status',''),'message':c.get('message','')} for c in coverage if c.get('status') not in ('ok','empty')]
     stronger=len(grouped['stronger_leads'])
+    confirmed={r['reference'] for r in records if r.get('analyst_status')=='Confirmed' and r.get('reference')}
+    counts={'raw_records':len(records),'candidate_records':len(grouped['stronger_leads'])+len(grouped['needs_review']),'unlinked_records':len(grouped['unlinked_results']),'rejected_records':len(grouped['rejected_evidence']),'analyst_confirmed_accounts':len(confirmed)}
     headline=('Evidence records containing multiple supplied identifiers: '+str(stronger)+'. Review their citations before attributing them to the same person.' if stronger else 'No record linked multiple supplied identifiers. Returned leads remain unverified; no identity conclusion was made.')
+    headline='Raw records: '+str(counts['raw_records'])+'; relevant candidates: '+str(counts['candidate_records'])+'; analyst-confirmed accounts: '+str(len(confirmed))+'. '+headline
     if run.get('cancel_requested'):headline='Investigation cancelled. This report contains partial results only. '+headline
-    return dict(grouped,headline=headline,coverage_gaps=gaps,review_flags=flags,
+    return dict(grouped,counts=counts,headline=headline,coverage_gaps=gaps,review_flags=flags,
                 unanswered=['Ownership of supplied and discovered accounts is not established.','Missing results may reflect source coverage, privacy settings, access failures or search limits.'],
                 method='Deterministic evidence summary; no generated biography or unsupported identity confidence score.',
                 searched=run.get('completed',0),discovered=len(run.get('discovered_clues',[])))
@@ -135,11 +141,11 @@ def execute(service,run):
         for value in case.get(field,[]):enqueue(kind,value)
     # Provided context is input, not independent evidence. Never send full notes to a provider.
     supplied_blob=case.get('notes','')+'\n'+'\n'.join(case.get('urls',[]))
-    supplied_blob+='\n'+'\n'.join((f.get('capture',{}).get('excerpt','')+'\n'+f.get('notes',''))[:10000] for f in run['supplied_findings'] if f.get('status')!='Rejected')
+    supplied_blob+='\n'+'\n'.join((f.get('capture',{}).get('excerpt','')+'\n'+f.get('notes',''))[:10000] for f in run['supplied_findings'] if f.get('status')!='Rejected' and not rejected(case,f.get('capture',{}).get('reference','')))
     for clue in extract_clues(supplied_blob,service.normalize)[:5]:enqueue(clue['kind'],clue['value'],origin='supplied-context')
     for name in case.get('names',[]):
-        terms=[name]+[case[x] for x in ('employer','location') if case.get(x)]
-        if len(terms)>1:enqueue('context',terms)
+        if case.get('employer'):enqueue('context',[name,case['employer']])
+        for location in locations(case):enqueue('context',[name,location])
     initial_count=len(queue)
     if opts['max_searches']<initial_count:run['limits_note']='Search budget is smaller than the supplied/context search plan; some inputs will remain unsearched.'
     def record(provider,source,row,task,origin='retrieved'):
@@ -158,13 +164,13 @@ def execute(service,run):
         if isinstance(row.get('observations'),dict):entry['observations']=row['observations']
         if row.get('lead_only'):entry['lead_only']=True
         if isinstance(row.get('attribution'),dict):entry['attribution']=row['attribution']
-        entry['relevance']=relevance(case,entry);records[fingerprint]=entry
+        entry['relevance']=relevance(case,entry);apply_decision(case,entry);records[fingerprint]=entry
         return entry
     for finding in run['supplied_findings']:
         capture=finding.get('capture',{})
         entry=record('User-selected notebook finding',finding.get('source',''),{'title':finding.get('title','Finding'),'detail':capture.get('excerpt',finding.get('notes',''))+'\nAnalyst notes: '+finding.get('notes',''),'reference':capture.get('reference','')},
                {'kind':'notebook','value':finding['id'],'depth':0},'user-supplied')
-        entry['analyst_status']=finding.get('status','Unverified lead')
+        if not entry.get('account_decision'):entry['analyst_status']=finding.get('status','Unverified lead')
     while queue and run['completed']<opts['max_searches'] and not cancelled.is_set():
         task=queue.popleft();kind,value=task['kind'],task['value'];seed=kind+': '+(' + '.join(value) if isinstance(value,list) else value)
         run.update(total=min(opts['max_searches'],run['completed']+len(queue)+1),message='Researching '+seed[:180]);service._save_run(run)
@@ -181,7 +187,10 @@ def execute(service,run):
         jobs=[]
         if opts['allow_hibp'] and kind=='email' and value.casefold() in {e.casefold() for e in case.get('emails',[])}:jobs.append(('Have I Been Pwned',lambda:service.collectors.hibp(value),'hibp:'+value.casefold()))
         if opts['allow_harvester'] and kind=='domain' and any(value==d or value.endswith('.'+d) for d in case.get('domains',[])):jobs.append(('theHarvester',lambda:service.collectors.harvester(value,run['id'],opts['harvester_sources']),'harvester:'+value))
-        if opts['allow_maigret'] and kind in ('username','instagram','tiktok','vsco') and task['depth']==0:jobs.append(('Maigret',lambda:service.collectors.maigret(value,run['id'],opts['maigret_sites']),'maigret:'+value.lstrip('@').casefold()))
+        if opts['allow_maigret'] and kind in ('username','instagram','tiktok','vsco') and task['depth']==0:
+            excluded=rejected_sites(case,value,opts['maigret_sites']);sites=[site for site in opts['maigret_sites'] if site not in excluded]
+            if excluded:reports.append({'results':[{'provider':'Maigret analyst exclusions','status':'ok','rows':[],'message':'Previously rejected account URLs were excluded for this handle.','checks':[{'site':site,'outcome':'rejected','reason':'Excluded by the saved case decision; no check requested.'} for site in excluded]}],'links':[]})
+            if sites:jobs.append(('Maigret',lambda:service.collectors.maigret(value,run['id'],sites),'maigret:'+value.lstrip('@').casefold()))
         for provider,call,identity in jobs:
             if cancelled.is_set() or identity in collector_attempts:continue
             collector_attempts.add(identity)
@@ -197,7 +206,7 @@ def execute(service,run):
                 if label=='Have I Been Pwned':
                     from additional_collectors import HIBP_ATTRIBUTION
                     run['attributions']=[HIBP_ATTRIBUTION]
-                run['coverage'].append({'seed':seed,'provider':label,'status':provider.get('status','error'),'count':len(rows),'source':provider.get('source',''),'message':provider.get('message','')})
+                run['coverage'].append({'seed':seed,'provider':label,'status':provider.get('status','error'),'count':len(rows),'source':provider.get('source',''),'message':provider.get('message',''),'checks':provider.get('checks',[])})
                 for row in rows:
                     origin='offline-metadata' if label=='Offline phone metadata' else 'retrieved'
                     entry=record(label,provider.get('source',''),row,task,origin)
@@ -207,6 +216,7 @@ def execute(service,run):
                         if field and relevance({field:[value]},entry)['matched_identifiers']:
                             entry['relevance']['can_expand']=True
                             entry['relevance']['supported_chain_identifier']=kind+': '+value
+                    if entry.get('analyst_status')=='Rejected':continue
                     if not opts['follow_clues'] or task['depth']>=opts['depth'] or origin!='retrieved' or label in ('Community Ban List','Have I Been Pwned'):continue
                     ref=entry['reference']
                     reference_clue=ref if detect_platform(ref) or urlparse(ref).hostname in ('steamcommunity.com','www.steamcommunity.com') else ''
@@ -234,8 +244,13 @@ def execute(service,run):
             if clue['status']=='attempted':clue['reason']='Follow-up processing finished; see source coverage for successful requests, failures or missing connections.'
     run['records']=list(records.values());run['analysis']=synthesis(run)
     result_code,message=outcome(run['coverage'],run['records'])
+    counts=run['analysis']['counts']
+    if run['records'] and not counts['candidate_records']:
+        result_code='no-relevant-leads';message='Processing finished, but no non-rejected records matched supplied identifiers. Raw/unlinked records are not successful discovery.'
+    elif counts['candidate_records']:
+        result_code='candidates-found';message='Unverified relevant candidates returned; account ownership requires review. Analyst-confirmed accounts: '+str(counts['analyst_confirmed_accounts'])+'.'
     run.update(status='cancelled' if cancelled.is_set() else 'complete',finished_at=now(),search_outcome=result_code,message='Investigation cancelled; partial report preserved.' if cancelled.is_set() else message,
-               summary={'inputs':initial_count,'records':len(records),'retrieved_records':sum(x['origin']=='retrieved' for x in records.values()),'supplied_records':sum(x['origin']=='user-supplied' for x in records.values()),
+               summary={**counts,'inputs':initial_count,'records':len(records),'retrieved_records':sum(x['origin']=='retrieved' for x in records.values()),'supplied_records':sum(x['origin']=='user-supplied' for x in records.values()),
                         'offline_records':sum(x['origin']=='offline-metadata' for x in records.values()),'source_errors':sum(x['status']=='error' for x in run['coverage']),'prepared_not_run':len(run['prepared_searches']),
                         'followups_scheduled':followups,'unsearched_inputs':len(queue),'search_budget':opts['max_searches']})
     service._save_run(run)

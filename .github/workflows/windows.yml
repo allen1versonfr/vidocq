@@ -33,8 +33,9 @@ jobs:
           node --check ui/spiderfoot.js
           node --check ui/assisted.js
           node --check ui/collectors.js
+          node --check ui/review.js
       - name: Build portable Windows executable
-        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name Vidocq --icon "build/assets/vidocq.ico" --add-data "build/assets;assets" --add-data "ui;ui" --add-data "source-catalog.json;." --add-data "docs/OSINT_FRAMEWORK_LICENSE.txt;." --add-data "scripts/local_ocr.ps1;scripts" --collect-all webview --collect-all phonenumbers --collect-all pypdfium2 --collect-all maigret --add-data "docs/MAIGRET_LICENSE.txt;docs" launch.py
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name Vidocq --icon "build/assets/vidocq.ico" --add-data "build/assets;assets" --add-data "ui;ui" --add-data "source-catalog.json;." --add-data "docs/OSINT_FRAMEWORK_LICENSE.txt;." --add-data "scripts/local_ocr.ps1;scripts" --add-data "scripts/burn_cleanup.ps1;scripts" --collect-all webview --collect-all phonenumbers --collect-all pypdfium2 --collect-all maigret --add-data "docs/MAIGRET_LICENSE.txt;docs" launch.py
       - name: Test actual Windows executable, replacement, restart and rollback
         run: python scripts/windows_smoke.py
       - uses: actions/upload-artifact@v4

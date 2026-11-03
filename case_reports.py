@@ -16,6 +16,7 @@ from web_search import outcome
 from social_profiles import PLATFORMS,normalize_profile,profile_reference
 from assisted_investigation import options as investigation_options, execute as execute_investigation, report_analysis_html, report_analysis_markdown
 from research_connectors import normalize_steam
+from discovery_review import locations,canonical_reference
 
 FIELDS=('names','usernames','emails','phones','domains','ips','instagram','tiktok','vsco','steam','urls')
 LIMITS={'names':3,'usernames':5,'emails':5,'phones':5,'domains':5,'ips':5,'urls':10,'instagram':5,'tiktok':5,'vsco':5,'steam':5}
@@ -63,6 +64,7 @@ def clean_case(payload,normalize):
         value=payload.get(field,'')
         if not isinstance(value,str) or len(value)>120 or any(ord(c)<32 for c in value):raise ValueError('Invalid '+field+' context.')
         result[field]=value.strip()
+    result['locations']=locations(payload)
     total=0
     for field in FIELDS:
         values=payload.get(field,[])
@@ -119,14 +121,43 @@ class CaseService:
         data=json.loads(row[0])
         for field in FIELDS:data.setdefault(field,[])
         data.setdefault('investigation',investigation_options(None))
-        data.setdefault('employer','');data.setdefault('location','')
+        data.setdefault('employer','');data.setdefault('location','');data.setdefault('locations',locations(data));data.setdefault('account_decisions',[])
         return data
     def update(self,key,payload):
         previous=self.get(key)
         data=clean_case(payload,self.normalize)
-        data.update(id=key,created_at=previous['created_at'])
+        data.update(id=key,created_at=previous['created_at'],account_decisions=previous.get('account_decisions',[]))
         with self.database() as db:db.execute('UPDATE cases SET data=?,updated_at=? WHERE id=?',(json.dumps(data),now(),key))
         return data
+    def account_decision(self,key,payload):
+        ref=canonical_reference(payload.get('reference',''));status=payload.get('status');reason=payload.get('reason','')
+        if status not in ('Rejected','Confirmed','Unverified'):raise ValueError('Choose Rejected, Confirmed or Unverified.')
+        if not isinstance(reason,str) or not reason.strip() or len(reason)>2000:raise ValueError('Explain the account decision (up to 2,000 characters).')
+        with self.lock,self.database() as db:
+            db.execute('BEGIN IMMEDIATE');row=db.execute('SELECT data FROM cases WHERE id=?',(key,)).fetchone()
+            if not row:raise ValueError('Case not found.')
+            case=json.loads(row[0]);decisions=case.setdefault('account_decisions',[])
+            old=next((d for d in decisions if d['reference']==ref),None)
+            decision={'reference':ref,'status':status,'reason':reason.strip(),'updated_at':now(),'history':(old.get('history',[])+[{k:old[k] for k in ('status','reason','updated_at')}]) if old else []}
+            if old:decisions[decisions.index(old)]=decision
+            else:
+                if len(decisions)>=100:raise ValueError('This case already has 100 account decisions.')
+                decisions.append(decision)
+            db.execute('UPDATE cases SET data=?,updated_at=? WHERE id=?',(json.dumps(case),now(),key))
+        return decision
+
+    def browser_capture(self,key,payload,save_finding):
+        case=self.get(key)
+        if payload.get('consent') is not True:raise ValueError('Confirm that this is evidence you reviewed in your browser.')
+        canonical_reference(payload.get('reference',''))
+        ref=payload['reference'].strip()
+        title=payload.get('title','');excerpt=payload.get('excerpt','');query=payload.get('query','')
+        if not isinstance(title,str) or not title.strip() or len(title)>500:raise ValueError('Enter an evidence title (up to 500 characters).')
+        if not isinstance(excerpt,str) or not excerpt.strip() or len(excerpt)>12000:raise ValueError('Paste a reviewed excerpt (up to 12,000 characters).')
+        if not isinstance(query,str) or len(query)>1000:raise ValueError('Query must be at most 1,000 characters.')
+        return save_finding({'title':title,'notes':'Manually reviewed browser evidence. Source text is user-supplied, not independently fetched or verified by Vidocq.','source':ref,'status':'Unverified lead','case_ids':[key],
+            'capture':{'provider':'Browser evidence (user captured)','reference':ref,'query':query,'retrieved_at':now(),'excerpt':excerpt,'origin':'browser-capture'}})
+
     def list(self):
         with self.database() as db:rows=db.execute('SELECT data FROM cases ORDER BY updated_at DESC LIMIT 100').fetchall()
         return [json.loads(x[0]) for x in rows]
@@ -159,6 +190,12 @@ class CaseService:
                 for finding_id in case['notebook_ids']:
                     row=db.execute('SELECT data FROM findings WHERE id=?',(finding_id,)).fetchone()
                     if row:supplied.append(json.loads(row[0]))
+                supplied_ids={f['id'] for f in supplied}
+                for raw, in db.execute('SELECT data FROM findings'):
+                    finding=json.loads(raw)
+                    if finding.get('capture',{}).get('origin')=='browser-capture' and key in finding.get('case_ids',[]) and finding['id'] not in supplied_ids:
+                        supplied.append(finding);supplied_ids.add(finding['id'])
+                if len(supplied)>60:raise ValueError('Use at most 60 supplied findings per run.')
                 if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='investigation_items'").fetchone():
                     items=[dict(json.loads(raw),kind=kind) for kind,raw in db.execute('SELECT kind,data FROM investigation_items')]
                     selected=set(case['notebook_ids'])
@@ -276,7 +313,8 @@ def report_html(run):
     searches=''.join('<li><strong>'+e(x['title'])+'</strong><p>'+e(x['seed'])+'</p><code>'+e(x['url'])+'</code></li>' for x in run['prepared_searches'])
     summary_text=('Processed '+str(summary.get('inputs',run['completed']))+' identifiers. '+str(summary.get('retrieved_records',0))+' records were retrieved from supported indexes, '+str(summary.get('offline_records',0))+' were offline metadata, and '+str(summary.get('supplied_records',0))+' were supplied notebook findings. '+str(summary.get('source_errors',0))+' source operations failed; '+str(summary.get('prepared_not_run',len(run['prepared_searches'])))+' browser searches were prepared but not run.')
     social='<h2>Supplied social profiles</h2>'+(''.join('<p>'+e(p['platform'])+' · @'+e(p['handle'])+'<br>'+e(p['reference'])+'<br>'+e(p['status'])+'</p>' for p in run.get('social_profiles',[])) or '<p>No platform profiles supplied.</p>')
-    context='<dl>'+''.join('<dt>'+e(field.replace('_',' ').title())+'</dt><dd>'+e('\n'.join(value) if isinstance(value,list) else value)+'</dd>' for field,value in run['case'].items() if field not in ('id','notebook_ids','created_at') and value)+'</dl>'
+    context_text=lambda value:'\n'.join(value) if isinstance(value,list) and all(isinstance(v,str) for v in value) else json.dumps(value,ensure_ascii=False,indent=2) if isinstance(value,(list,dict)) else str(value)
+    context='<dl>'+''.join('<dt>'+e(field.replace('_',' ').title())+'</dt><dd>'+e(context_text(value))+'</dd>' for field,value in run['case'].items() if field not in ('id','notebook_ids','created_at') and value)+'</dl>'
     context+='<h2>Analyst relationships and timeline (supplied assertions)</h2><pre>'+e(json.dumps(run.get('investigation_items',[]),ensure_ascii=False,indent=2))+'</pre>'
     if any(c.get('provider')=='Have I Been Pwned' for c in run.get('coverage',[])):
         context+='<p>Breach data: <a href="https://haveibeenpwned.com/" rel="noreferrer">Have I Been Pwned</a>, licensed under CC BY 4.0.</p>'

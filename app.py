@@ -15,11 +15,13 @@ import time
 import webbrowser
 from datetime import datetime, timezone
 from version import VERSION
+from discovery_review import profile_handle
 from social_profiles import PLATFORMS,detect_platform,normalize_profile,profile_reference
 from web_search import CLIENT as WEB_SEARCH,SearchNotConfigured,outcome
 from research_connectors import CLIENT as CONNECTORS, normalize_steam, is_steam_id
 from additional_collectors import CLIENT as COLLECTORS
 from updater import UpdateManager
+from burn import BurnManager
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -31,6 +33,7 @@ ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
 DATA = Path(os.environ.get('VIDOCQ_DATA') or os.environ.get('ALL_SEEING_EYES_DATA') or os.environ.get('OSINT_DESK_DATA') or (Path(os.environ.get('LOCALAPPDATA', Path.home()/'.local/share')) / 'Vidocq'))
 EXIT_EVENT = threading.Event()
 UPDATES = UpdateManager(DATA)
+BURN = BurnManager(DATA)
 NETWORK_HOSTS = frozenset({'archive.org', 'crt.sh', 'en.wikipedia.org', 'rdap.arin.net', 'rdap.db.ripe.net', 'rdap.apnic.net', 'rdap.lacnic.net', 'rdap.afrinic.net', 'openlibrary.org', 'api.gdeltproject.org'})
 LINK_HOSTS = NETWORK_HOSTS | {'www.google.com', 'www.bing.com', 'lookup.icann.org', 'stat.ripe.net', 'duckduckgo.com', 'scholar.google.com', 'pubmed.ncbi.nlm.nih.gov', 'patents.google.com'}
 COOKIE = secrets.token_urlsafe(32)
@@ -68,6 +71,7 @@ def normalize(kind, value):
     if kind=='steam' or (kind=='auto' and (is_steam_id(value) or re.match(r'^(?:https?://)?(?:www\.)?steamcommunity\.com/',value))):return 'steam',normalize_steam(value)
     if kind in PLATFORMS:return kind,normalize_profile(kind,value)
     if kind=='auto' and detect_platform(value):return normalize(detect_platform(value),value)
+    if kind=='auto' and profile_handle(value):return 'username',profile_handle(value)
     if kind=='phone':
         from phone_lookup import inspect_phone
         return 'phone',inspect_phone(value)['e164']
@@ -299,6 +303,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path=='/':return self.send(200,(ROOT/'ui/index.html').read_bytes(),'text/html; charset=utf-8',cookie=True)
         if not self.authorized():return self.send(403,{'error':'Open the local app window first.'})
         route=urlparse(self.path).path
+        if route=='/review.js':return self.send(200,(ROOT/'ui/review.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/collectors.js':return self.send(200,(ROOT/'ui/collectors.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/api/collectors':return self.send(200,COLLECTORS.status())
         if route=='/assisted.js':return self.send(200,(ROOT/'ui/assisted.js').read_bytes(),'application/javascript; charset=utf-8')
@@ -350,6 +355,17 @@ class Handler(BaseHTTPRequestHandler):
             if size<1 or size>limit:raise ValueError('Invalid request size.')
             p=json.loads(self.rfile.read(size))
             if not isinstance(p,dict):raise ValueError('Invalid request.')
+            if BURN.pending:return self.send(409,{'error':'Vidocq burn is pending; new writes are disabled.'})
+            if self.path=='/api/burn/preview':
+                if CASES.active or UPDATES.status()['phase'] in ('checking','downloading','applying'):raise ValueError('Wait for investigations and updates to finish before deletion.')
+                return self.send(200,BURN.preview(p.get('remove_executable',False)))
+            if self.path=='/api/burn/execute':
+                if CASES.active or UPDATES.status()['phase'] in ('checking','downloading','applying'):raise ValueError('Wait for investigations and updates to finish before deletion.')
+                result=BURN.execute(p);self.send(202,result)
+                def finish_burn():
+                    if COLLECTORS.manager:COLLECTORS.manager.stop()
+                    os._exit(0)
+                threading.Timer(1,finish_burn).start();return
             if self.path=='/api/collectors/maigret/setup':return self.send(200,COLLECTORS.setup_maigret())
             if self.path=='/api/collectors':return self.send(200,COLLECTORS.configure(p))
             if self.path=='/api/collectors/lookup':
@@ -386,6 +402,10 @@ class Handler(BaseHTTPRequestHandler):
                 from phone_lookup import inspect_phone
                 return self.send(200,inspect_phone(p.get('value',''),p.get('region','US')))
             if self.path=='/api/cases':return self.send(201,CASES.create(p))
+            review=re.fullmatch(r'/api/cases/([0-9a-f]{24})/(account-decisions|browser-evidence)',self.path)
+            if review:
+                if review[2]=='account-decisions':return self.send(200,CASES.account_decision(review[1],p))
+                return self.send(201,CASES.browser_capture(review[1],p,INVESTIGATION.save_finding))
             case_edit=re.fullmatch(r'/api/cases/([0-9a-f]{24})',self.path)
             if case_edit:return self.send(200,CASES.update(case_edit[1],p))
             case_run=re.fullmatch(r'/api/cases/([0-9a-f]{24})/run',self.path)

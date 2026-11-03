@@ -153,7 +153,7 @@ class AssistedCaseTests(unittest.TestCase):
     def test_context_search_and_supplied_notes_do_not_visit_urls(self):
         contexts=[];self.service.context_search=lambda terms:contexts.append(terms) or {'results':[],'links':[]}
         run=self.finish(self.make(employer='Example Org',location='Example City',notes='Reference https://example.com/page'))
-        self.assertEqual(contexts,[['Example Person','Example Org','Example City']]);self.assertIn(('domain','example.com'),self.calls)
+        self.assertEqual(contexts,[['Example Person','Example Org'],['Example Person','Example City']]);self.assertIn(('domain','example.com'),self.calls)
         self.assertFalse(any('https://' in str(v) for k,v in self.calls))
     def test_direct_connectors_require_case_opt_in_and_remain_unverified(self):
         fake=MagicMock();fake.steam.return_value={'results':[{'provider':'Steam public profile','status':'ok','source':'https://api.steampowered.com','rows':[{'title':'Profile','detail':'Example Person','reference':'https://steamcommunity.com/id/example/','observations':{'reported_name':'Different Name'}}]}],'links':[]}

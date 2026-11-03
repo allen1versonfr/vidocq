@@ -1,5 +1,7 @@
 # Data and privacy
 
+Browser-reviewed excerpts and account decisions/history stay in the local SQLite workspace and user-created exports/backups. Captures are user-supplied, never silently fetched. Burn deletes only previewed paths after typed confirmation; external exports and browser/OS/provider records remain outside its scope. See [review and burn scope](REVIEW_AND_BURN.md). This release does not download or run a language model.
+
 [← Project overview](../README.md)
 
 ## Local data

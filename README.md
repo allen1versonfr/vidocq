@@ -24,7 +24,11 @@
 
 Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-The current Windows release is **2.12.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+The current Windows release is **2.13.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+
+## Reviewable investigations and local cleanup
+
+Profile links supply handle clues, locations are searched separately, and Maigret preserves per-site outcomes. Capture reviewed browser excerpts and remember case-specific ownership decisions. Reports distinguish raw records, relevant candidates and analyst confirmations. A preview-and-confirm Burn control removes named local app files and optionally the current Windows executable/adjacent update backup; it does not promise forensic erasure or remove external exports, backups or browser/OS records. [Review and burn guide](docs/REVIEW_AND_BURN.md). [Local LLM assessment](docs/LOCAL_LLM_ASSESSMENT.md).
 
 ## Free web search and browser review
 

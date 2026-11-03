@@ -182,6 +182,31 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
         assert all('api.mwmbl.org' in row['source'] for row in free_result['results'])
         with request('/api/search-connection',{'provider':'mwmbl','enabled':False}) as response:assert not json.load(response)['enabled']
         print('Frozen free anonymous web search returned live canary results without a paid key or account.')
+        with request('/review.js') as response:assert b'burn-preview' in response.read()
+        with request('/api/cases',{'title':'Browser review fixture','names':['Example Person'],'usernames':['example'],'urls':['https://twitch.tv/example'],'location':'City One; City Two','investigation':{'enabled':True,'max_searches':8,'max_followups':0}}) as response:review_case=json.load(response)
+        with request('/api/cases/'+review_case['id']+'/browser-evidence',{'title':'Reviewed public evidence','reference':'https://example.org/about','excerpt':'Example Person uses example as a public handle.','query':'Example Person','consent':True}) as response:captured=json.load(response)
+        assert captured['capture']['origin']=='browser-capture'
+        with request('/api/cases/'+review_case['id']+'/account-decisions',{'reference':'https://steamcommunity.com/id/example','status':'Rejected','reason':'Synthetic known wrong-account fixture.'}) as response:assert json.load(response)['status']=='Rejected'
+        with request('/api/cases/'+review_case['id']+'/run',{'consent':True}) as response:review_run=json.load(response)
+        deadline=time.monotonic()+30
+        while True:
+            with request('/api/case-runs/'+review_run['id']) as response:review_report=json.load(response)
+            if review_report['status']=='complete':break
+            assert review_report['status'] in ('queued','running') and time.monotonic()<deadline,review_report
+            time.sleep(.1)
+        assert ('domain','twitch.tv') not in [(t['kind'],t['value']) for t in review_report['search_log']]
+        assert [t['value'] for t in review_report['search_log'] if t['kind']=='context']==[['Example Person','City One'],['Example Person','City Two']]
+        assert any(r['origin']=='user-supplied' and r['reference']=='https://example.org/about' for r in review_report['records'])
+        with request('/api/case-runs/'+review_run['id']+'?format=html') as response:assert 'Synthetic known wrong-account fixture.' in response.read().decode()
+        with request('/api/case-runs/'+review_run['id']+'?format=markdown') as response:assert 'Synthetic known wrong-account fixture.' in response.read().decode()
+        with request('/api/burn/preview',{'remove_executable':False}) as response:burn_preview=json.load(response)
+        assert burn_preview['data_directory']==str((root/'data').resolve()) and burn_preview['files']
+        try:
+            request('/api/burn/execute',{'token':burn_preview['token'],'confirmation':'not confirmed'})
+            raise AssertionError('Burn accepted an incorrect confirmation')
+        except urllib.error.HTTPError as error:assert error.code==400
+        assert (root/'data'/'workspace.sqlite3').exists()
+        print('Frozen browser evidence, account decisions, location planning, relevance counts and non-destructive burn preview passed.')
         with request('/api/workspace/backup',{'password':'synthetic backup password'}) as response:bundle=json.load(response)
         assert bundle['encrypted']
         with request('/api/workspace/restore',dict(bundle,password='synthetic backup password')) as response:preview=json.load(response)
@@ -220,3 +245,48 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
                 try:child.wait(timeout=60)
                 except psutil.NoSuchProcess:pass
     print('Frozen imports/UI/database, executable replacement/restart, and failed-launch rollback passed.')
+
+    burn_folder=root/'disposable-burn';burn_folder.mkdir()
+    burn_target=burn_folder/'Disposable-Vidocq.exe';shutil.copyfile(exe,burn_target)
+    burn_backup=burn_target.with_name(burn_target.name+'.previous');shutil.copyfile(exe,burn_backup)
+    burn_data=root/'disposable-burn-data';burn_data.mkdir()
+    sentinel=burn_data/'unrelated-sentinel.txt';sentinel.write_text('Preserve unrelated files.')
+    burn_env=dict(env,VIDOCQ_DATA=str(burn_data))
+    with socket.socket() as listener:
+        listener.bind(('127.0.0.1',0));burn_port=listener.getsockname()[1]
+    burn_process=subprocess.Popen([str(burn_target),'--serve-only','--port',str(burn_port)],env=burn_env)
+    burn_client=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()))
+    burn_base='http://127.0.0.1:'+str(burn_port)
+    def burn_request(path,payload=None):
+        req=urllib.request.Request(burn_base+path,data=None if payload is None else json.dumps(payload).encode(),headers={} if payload is None else {'Content-Type':'application/json'})
+        return burn_client.open(req,timeout=90)
+    try:
+        deadline=time.monotonic()+90
+        while True:
+            try:
+                with burn_request('/') as response:assert response.status==200
+                break
+            except urllib.error.URLError:
+                assert burn_process.poll() is None and time.monotonic()<deadline
+                time.sleep(.5)
+        with burn_request('/api/cases',{'title':'Disposable deletion fixture','usernames':['synthetic']}) as response:assert json.load(response)['id']
+        with burn_request('/api/burn/preview',{'remove_executable':True}) as response:plan=json.load(response)
+        assert plan['executable']==str(burn_target.resolve()) and set(plan['executable_files'])=={str(burn_target.resolve()),str(burn_backup.resolve())}
+        assert all(Path(f['path']).parent==burn_data.resolve() for f in plan['files'])
+        with burn_request('/api/burn/execute',{'token':plan['token'],'confirmation':'BURN VIDOCQ'}) as response:burn_result=json.load(response)
+        assert burn_result['closing']
+        failure_path=Path(burn_result['message'].split('details remain at ',1)[1].removesuffix('.'));helper_folder=failure_path.parent
+        assert helper_folder.name.startswith('Vidocq-burn-')
+        burn_process.wait(timeout=90)
+        deadline=time.monotonic()+90
+        expected_removed=[burn_target,burn_backup,helper_folder]+[Path(f['path']) for f in plan['files']]
+        while any(p.exists() for p in expected_removed) and time.monotonic()<deadline:
+            assert not failure_path.exists(),failure_path.read_text() if failure_path.exists() else ''
+            time.sleep(.5)
+        assert not any(p.exists() for p in expected_removed),'Disposable burn did not finish within its deadline'
+        assert sentinel.read_text()=='Preserve unrelated files.' and exe.exists()
+        print('Actual disposable Windows burn removed only its fixture database/logs, copied executable and copied backup; unrelated data and the build remained intact.')
+    finally:
+        if burn_process.poll() is None:
+            subprocess.run(['taskkill','/PID',str(burn_process.pid),'/T','/F'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
+            burn_process.wait(timeout=20)

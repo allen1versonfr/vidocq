@@ -1,9 +1,11 @@
-# Vidocq 2.12.0 - Free web search, optional Brave
+# Vidocq 2.13.0 - Reviewable investigations and scoped burn
 
-Search connection now offers free anonymous Mwmbl web search. Click Enable free web search: no account, key, payment card or subscription is required. Brave remains optional and existing keys continue to work.
+- Parse supported public profile links as handles, avoid shared-platform domain pivots and search location alternatives separately.
+- Preserve each Maigret site's outcome and distinguish raw records, relevant candidates and analyst-confirmed accounts.
+- Remember per-case account decisions/history, exclude known-rejected site/handle combinations and preserve immutable prior reports.
+- Capture reviewed browser excerpts with their source/query as user-supplied case evidence.
+- Add Burn Vidocq with exact-path preview and typed confirmation. It deletes named workspace/log files and optionally the current Windows executable/adjacent update backup after exit. Unrelated files are preserved. It does not promise forensic erasure or removal of external exports, backups or browser/OS records.
 
-The free provider feeds Research and case/context queries, with request spacing, caching, session limits and explicit quota/outage gaps. Its smaller index can miss profiles. It never switches to a paid provider automatically or forwards Brave credentials.
+The local LLM assessment recommends an optional citation-validated drafting layer after deterministic fixes. No model is bundled or downloaded.
 
-Personal-name research no longer fills reports with unrelated Wikipedia/news fallback records. Prepared searches include buttons to open them in your default Chrome/Firefox/other browser for manual review.
-
-Setup and limits: docs/FREE_WEB_SEARCH.md. Live public canaries test anonymous search; no consenting-person test data is included in the release.
+Guides: docs/REVIEW_AND_BURN.md and docs/LOCAL_LLM_ASSESSMENT.md. Deletion tests use disposable fixtures only; no personal investigation data is included in this release.
