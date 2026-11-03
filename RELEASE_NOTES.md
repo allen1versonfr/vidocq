@@ -1,17 +1,14 @@
-# Vidocq 2.7.0 — Investigation workspace
+# Vidocq 2.8.0 — SpiderFoot import
 
-This update adds all seven investigation workflow improvements:
+Bring SpiderFoot collection results into Vidocq for evidence review and reporting.
 
-- Structured, preserved evidence captures with stable IDs and separate editable assessments.
-- Notebook editing, assessment history, tags, search, case/entity filters and duplicate review.
-- Evidence-backed entity relationships with Proposed/Supported/Rejected assessments and explicit merge/split workflows.
-- Timelines with event dates, approximate dates/ranges, source/entity/case filters and separate discovery dates.
-- Report snapshot comparisons with newly returned, changed and absent records plus source coverage.
-- Local PDF, text and screenshot imports, Windows OCR, original-file hashes and page/passage citations.
-- Complete workspace backup and restore, optional authenticated encryption, preview, hash/reference validation and atomic import.
+- Investigation → SpiderFoot import accepts standard flat JSON scan-results exports from open-source SpiderFoot, up to 10 MB / 5,000 records.
+- Preview records, counts and source-link gaps before confirming a local import.
+- Preserve original JSON/hash, complete records, modules, source values, last-seen text and false-positive flags.
+- Create type-aware entities and proposed discovery relationships, with optional case assignment.
+- Re-importing identical records preserves analyst edits and avoids duplicate findings/links.
+- Imported records and original files are included in workspace backup/restore.
 
-Existing notebooks and immutable reports remain compatible. New report snapshots retain relevant analyst relationship/timeline assertions.
+No scans or source visits run during import. Standard exports omit event/scan IDs and timezone offsets; exact event ancestry and UTC timestamps cannot be recreated. Ambiguous/missing source values remain explicitly unresolved. Imported relationships are discovery leads, not proof of identity or ownership. HX-specific export formats are not validated.
 
-OCR requires Windows 10/11 and installed OCR language support; review extracted text against originals. Imports are limited to 10 MB, 100 PDF pages and up to 20 scanned pages for OCR. Workspace bundles are limited to 50 MB. Bundle encryption does not encrypt the local working database. Conflicting restore records are rejected rather than overwritten; use a separate empty workspace for an older conflicting backup.
-
-Download Vidocq.exe for Windows 10/11 x64. The source-code archive is for development. See docs/INVESTIGATION.md for the workflows and limits.
+See docs/SPIDERFOOT.md for the workflow, limits and privacy handling. Existing notebooks and reports remain compatible.

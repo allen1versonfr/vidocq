@@ -1,3 +1,11 @@
+# 2.8.0 — SpiderFoot JSON import
+
+- Add local preview/confirm import of standard SpiderFoot JSON results.
+- Preserve complete source records, original JSON/hash, modules, last-seen text and false-positive flags.
+- Create typed entities and proposed discovery links; retain ambiguous/missing source values without asserting exact event ancestry.
+- Keep repeat imports idempotent while preserving analyst edits, with optional case assignment and normal workspace backup support.
+- Add parser, transaction, HTTP and packaged-executable regression checks.
+
 # 2.7.0 — Investigation workspace
 
 - Preserve structured evidence and attachments separately from editable assessments; retain notebook compatibility and assessment history.

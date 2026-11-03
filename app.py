@@ -291,6 +291,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path=='/':return self.send(200,(ROOT/'ui/index.html').read_bytes(),'text/html; charset=utf-8',cookie=True)
         if not self.authorized():return self.send(403,{'error':'Open the local app window first.'})
         route=urlparse(self.path).path
+        if route=='/spiderfoot.js':return self.send(200,(ROOT/'ui/spiderfoot.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/investigation.js':return self.send(200,(ROOT/'ui/investigation.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/api/investigation':return self.send(200,INVESTIGATION.items())
         attachment=re.fullmatch(r'/api/attachments/([0-9a-f]{24})',route)
@@ -333,10 +334,13 @@ class Handler(BaseHTTPRequestHandler):
         if not self.authorized():return self.send(403,{'error':'Invalid local session or origin.'})
         try:
             size=int(self.headers.get('Content-Length','0'))
-            limit=71_000_000 if self.path in ('/api/workspace/restore','/api/workspace/backup') else 14_100_000 if self.path=='/api/ingest' else 7_100_000 if self.path=='/api/image-search' else 200_000
+            limit=71_000_000 if self.path in ('/api/workspace/restore','/api/workspace/backup') else 14_100_000 if self.path in ('/api/ingest','/api/import/spiderfoot') else 7_100_000 if self.path=='/api/image-search' else 200_000
             if size<1 or size>limit:raise ValueError('Invalid request size.')
             p=json.loads(self.rfile.read(size))
             if not isinstance(p,dict):raise ValueError('Invalid request.')
+            if self.path=='/api/import/spiderfoot':
+                from spiderfoot_import import import_spiderfoot
+                return self.send(200,import_spiderfoot(INVESTIGATION,p))
             if self.path=='/api/investigation':return self.send(200,INVESTIGATION.save_item(p))
             if self.path=='/api/investigation/reorganize':return self.send(200,INVESTIGATION.reorganize(p))
             if self.path=='/api/ingest':return self.send(200,INVESTIGATION.ingest(p))

@@ -41,6 +41,7 @@ Use `python app.py` for the native window when the necessary GUI runtime is avai
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 node --check ui/app.js
 node --check ui/investigation.js
+node --check ui/spiderfoot.js
 .\build_windows.bat
 ```
 

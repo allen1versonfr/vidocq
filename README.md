@@ -24,7 +24,11 @@
 
 Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-The current Windows release is **2.7.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+The current Windows release is **2.8.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+
+## SpiderFoot import
+
+Import standard SpiderFoot JSON results locally with preview, original evidence preservation, typed entities and proposed discovery links. [SpiderFoot import guide →](docs/SPIDERFOOT.md)
 
 ## New investigation workspace
 

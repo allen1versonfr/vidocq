@@ -47,3 +47,7 @@ Use device encryption and operating-system access controls if your findings are 
 ## Investigation evidence and backups (2.7.0)
 
 Imported documents/screenshots, original bytes and hashes, extracted text, entities, relationships, timeline events and assessment history are stored locally in SQLite without encryption. OCR uses Windows locally; no OCR service receives files. Complete workspace bundles optionally use password encryption. This does not encrypt local SQLite data or report/notebook exports. Bundle passwords are never persisted. See [the investigation guide](INVESTIGATION.md) for limits and restore behavior.
+
+## SpiderFoot imports (2.8.0)
+
+JSON imports preserve original files and records locally. No SpiderFoot server, source URL or index provider is contacted by preview/import. Imported connections are unverified discovery leads. Original files and metadata remain unencrypted in SQLite and are included in workspace bundles. See [SpiderFoot import](SPIDERFOOT.md).
