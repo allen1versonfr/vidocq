@@ -6,3 +6,5 @@
 .case-table{overflow-x:auto}.case-table td{vertical-align:top;overflow-wrap:anywhere;min-width:100px}#case-progress{width:100%}#case-report p,#phone-results dd{white-space:pre-wrap;overflow-wrap:anywhere}#case-findings{min-height:130px;width:100%}nav{flex-wrap:wrap}#case-runs{width:100%;margin-bottom:16px}
 
 #source-health-status{white-space:pre-wrap}
+
+.brand{display:inline-flex;align-items:center;gap:8px}.brand img{display:block;flex-shrink:0}

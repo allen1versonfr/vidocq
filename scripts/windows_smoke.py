@@ -16,6 +16,8 @@ import urllib.error
 from http.cookiejar import CookieJar
 
 exe = Path('dist/Vidocq.exe').resolve()
+from check_windows_icon import verify
+verify(exe,'build/assets/vidocq.ico')
 env = dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT='1')
 with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
     root = Path(temp)
@@ -42,7 +44,12 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
             except urllib.error.URLError:
                 if server.poll() is not None or time.monotonic()>=deadline:raise
                 time.sleep(.5)
-        with request('/api/cases',{'title':'Frozen case report','phones':['2025550123'],'usernames':['example']}) as response:case=json.load(response)
+        with request('/api/search-connection',{'key':'','enabled':False}) as response:assert not json.load(response)['configured']
+        for platform,url in [('instagram','https://www.instagram.com/example/'),('tiktok','https://www.tiktok.com/@example'),('vsco','https://vsco.co/example/gallery')]:
+            with request('/api/research',{'kind':'auto','value':url}) as response:result=json.load(response)
+            assert result['kind']==platform and result['social_profile']['handle']=='example'
+            assert result['results'][0]['status']=='not-configured' and len(result['links'])==3
+        with request('/api/cases',{'title':'Frozen case report','phones':['2025550123'],'usernames':['example'],'instagram':['@example'],'tiktok':['https://www.tiktok.com/@example'],'vsco':['https://vsco.co/example/gallery']}) as response:case=json.load(response)
         with request('/api/cases/'+case['id']+'/run',{'consent':True}) as response:run=json.load(response)
         deadline=time.monotonic()+30
         while True:
@@ -51,9 +58,11 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
             assert report['status'] in ('queued','running'),report
             assert time.monotonic()<deadline,'Frozen case report timed out'
             time.sleep(.25)
+        assert len(report['social_profiles'])==3 and report['completed']==5
+        assert {p['platform'] for p in report['social_profiles']}=={'instagram','tiktok','vsco'}
         assert report['summary']['offline_records']==1 and report['summary']['prepared_not_run']>0
         with request('/api/case-runs/'+run['id']+'?format=html') as response:
-            text=response.read().decode();assert 'Frozen case report' in text and 'Offline phone metadata' in text
+            text=response.read().decode();assert 'Frozen case report' in text and 'Offline phone metadata' in text and 'https://www.tiktok.com/@example/' in text and 'https://www.instagram.com/example/' in text and 'https://vsco.co/example/' in text
         print('Actual frozen phone/case/report/HTML export API passed.')
     finally:
         subprocess.run(['taskkill','/PID',str(server.pid),'/T','/F'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)

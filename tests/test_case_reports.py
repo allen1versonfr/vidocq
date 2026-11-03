@@ -90,6 +90,24 @@ class CaseTests(unittest.TestCase):
         self.assertEqual(run['search_outcome'],'not-searched')
         self.assertIn('No online result search completed',report_html(run))
         self.assertIn('No online result search completed',report_markdown(run))
+    def test_social_only_case_and_report_exports(self):
+        case=self.make(names=[],instagram=['@Example','https://www.instagram.com/example/?igsh=test'],tiktok=['https://www.tiktok.com/@Example'],vsco=['https://vsco.co/example-name/gallery'])
+        self.assertEqual(case['instagram'],['example']);self.assertEqual(case['tiktok'],['example'])
+        run=self.finish(case)
+        self.assertEqual(run['completed'],3);self.assertEqual(len(run['social_profiles']),3)
+        self.assertIn(('instagram','example'),self.calls);self.assertIn(('tiktok','example'),self.calls);self.assertIn(('vsco','example-name'),self.calls)
+        for exported in (report_html(run),report_markdown(run)):
+            self.assertIn('https://www.instagram.com/example/',exported)
+            self.assertIn('https://www.tiktok.com/@example/',exported);self.assertIn('https://vsco.co/example-name/',exported)
+            self.assertIn('not visited or verified',exported)
+    def test_old_cases_gain_empty_social_fields_without_changing_snapshots(self):
+        case=self.make();old=dict(case);old.pop('instagram');old.pop('tiktok');old.pop('vsco')
+        with self.db() as db:db.execute('UPDATE cases SET data=? WHERE id=?',(json.dumps(old),case['id']))
+        loaded=self.service.get(case['id']);self.assertEqual(loaded['instagram'],[])
+        run=self.finish(loaded);self.assertEqual(run['status'],'complete');self.assertEqual(run['social_profiles'],[])
+    def test_social_limits_and_invalid_profiles(self):
+        for data in [{'instagram':['example'+str(i) for i in range(6)]},{'tiktok':['https://www.tiktok.com/@example/video/123']},{'instagram':['https://evil.example/user']}]:
+            with self.assertRaises(ValueError):self.make(**data)
     def test_report_snapshot_does_not_change_after_case_edit(self):
         case=self.make();run=self.finish(case)
         self.service.update(case['id'],{'title':'Different','names':['Another Person']})

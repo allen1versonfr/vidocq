@@ -2,6 +2,14 @@
 
 Changes documented from the releases created for this repository.
 
+## 2.6.0 — 2026-11-03
+
+- Added Instagram, TikTok and VSCO handles/profile links to Research and Cases & reports, with platform-scoped index retrieval and prepared searches.
+- Added canonical supplied profile references in report snapshots and every export; preserved old cases/reports.
+- Added a multi-resolution navy/gold Windows application icon, matching UI mark and stable taskbar identity.
+- Expanded the frozen Windows smoke test for social profile APIs/exports and exact embedded icon verification.
+- 98 automated tests plus frontend syntax, live public canaries and frozen Windows release gates.
+
 ## 2.5.1 — 2026-11-03
 
 - Fixed full-name auto detection and misleading zero-result outcomes.

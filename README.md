@@ -24,13 +24,14 @@
 
 Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-The current Windows release is **2.5.1**. Its 83 automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+The current Windows release is **2.6.0**. Its 98 automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
 
 ## What you can do
 
 | Workspace | What it offers |
 | --- | --- |
 | **Cases & reports** | Combine supplied identifiers and selected notebook evidence into persistent, cited report snapshots; export printable HTML, Markdown or JSON. |
+| **Social profiles** | Add Instagram, TikTok and VSCO handles or profile links to research and cases; retrieve platform-scoped snippets with your optional Brave connection. |
 | **Phone** | Normalize numbers and inspect offline numbering-plan metadata without calling, messaging or identifying an owner. |
 | **Research** | Look up domains, public IPs, and topics through reviewed third-party indexes. Retrieve indexed mentions with an optional Brave API connection. |
 | **Image search** | Search SauceNAO for possible image-source matches, with similarity scores and source references. |
@@ -48,6 +49,7 @@ The current Windows release is **2.5.1**. Its 83 automated tests and Windows exe
 | Topic / organization | Wikipedia and Open Library catalog results | Google, Bing, DuckDuckGo, Wikipedia, Google Scholar, PubMed, Open Library, Google Patents |
 | Username | Optional Brave web-index snippets; no account-existence checks | Google, Bing, and Google queries scoped to GitHub, Reddit, Instagram, or TikTok |
 | Email | Optional Brave web-index snippets; no mailbox or account validation | Google and Bing |
+| Instagram / TikTok / VSCO | Optional Brave platform-scoped index snippets; supplied profile addresses are never visited or verified | Google, Bing, DuckDuckGo platform searches |
 | Person | Wikipedia, GDELT recent news, optional Brave web-index snippets | Google, Bing, DuckDuckGo |
 | Phone | Offline numbering metadata and optional Brave indexed mentions; no owner verification | Google, Bing, DuckDuckGo |
 | Image | SauceNAO visual matches after upload consent | Returned source addresses are displayed as references |
@@ -56,7 +58,7 @@ Providers can return incomplete data, errors, or no results. A match is a lead t
 
 ## From a few identifiers to a sourced report
 
-Use **Cases & reports** to supply names, usernames, emails, phones, domains, public IPs, reference URLs, notes and selected notebook findings together. Vidocq searches supported indexes, tracks failures and gaps, deduplicates exact records and produces a report with source citations. Names use Wikipedia and GDELT’s recent news index; phone analysis is offline. An enabled **Search connection** retrieves Brave web-index snippets for names, usernames, emails and phone numbers; without it, email/username/phone web searches remain prepared links. The app cannot establish identity or promise everything on the internet.
+Use **Cases & reports** to supply names, usernames, Instagram/TikTok/VSCO profiles, emails, phones, domains, public IPs, reference URLs, notes and selected notebook findings together. Vidocq searches supported indexes, tracks failures and gaps, deduplicates exact records and produces a report with source citations. Names use Wikipedia and GDELT’s recent news index; phone analysis is offline. An enabled **Search connection** retrieves Brave web-index snippets for names, usernames, Instagram/TikTok/VSCO profiles, emails and phone numbers; without it, email/username/phone web searches remain prepared links. The app cannot establish identity or promise everything on the internet.
 
 [Case workflow, phone limits and report exports →](docs/CASES.md)
 
@@ -65,6 +67,14 @@ Use **Cases & reports** to supply names, usernames, emails, phones, domains, pub
 Open **Search connection** and run **Check public sources**. Source errors, no matches and missing search connections are shown separately. Auto detect recognizes multi-word names. Wikipedia and news indexes do not cover most people. For general indexed mentions, enter your own Brave Search API key and enable it, then rerun the research or create a new report snapshot. Keys stay in memory for the session; optional `VIDOCQ_BRAVE_API_KEY` configuration is managed by you. The app only requests API snippets and never follows original result URLs.
 
 Brave is optional and is not unlimited free search. Its current plan provides $5 monthly credits, requires a payment card at signup, and charges for usage beyond credits. Review [current pricing and signup conditions](https://api-dashboard.search.brave.com/documentation/resources/help-feedback) before enabling. Vidocq limits requests to 100 per app session; this is not a billing guarantee. No Brave account or key is included.
+
+## Social profiles and Windows icon
+
+In **Research**, choose Instagram, TikTok or VSCO and enter a handle, or paste a full profile URL with Auto detect. In **Cases & reports**, each platform has a separate field. Up to five handles per platform count toward the existing fifteen-identifier total. VSCO profile links ending in `/gallery` are supported. Post/video/short links are rejected; supply the full profile address instead. The app keeps platform identity and canonical supplied references in report snapshots and all exports. Older cases continue to load.
+
+With Brave enabled, the app searches `site:instagram.com`, `site:tiktok.com` or `site:vsco.co` and returns index snippets and source references. Without a key, it offers prepared index queries and reports that no online search ran. Supplied profiles and returned mentions are unverified; the app does not infer that handles across platforms belong to one person. No profile visits, account checks, follower scraping, remote thumbnails or media downloads occur.
+
+The portable executable includes a new navy/gold Vidocq magnifier icon in Windows sizes from 16–256 pixels, with a stable taskbar app identity. A standalone `Vidocq.ico` is also attached to releases. The Windows gate verifies the exact generated icon frames inside the executable.
 
 ## Framework coverage
 

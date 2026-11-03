@@ -16,6 +16,7 @@ Open **Cases & reports** and create a case. You can supply:
 
 - Up to three names or aliases.
 - Up to five usernames, emails, phone numbers, domains, or public IPs per field.
+- Up to five Instagram, TikTok and VSCO handles/profile URLs in each separate platform field.
 - Up to fifteen searchable identifiers total, after normalization and deduplication.
 - Up to ten reference URLs and 20,000 characters of notes as additional context.
 - Up to thirty explicitly selected notebook findings as supplied evidence.
@@ -29,8 +30,9 @@ Enter one identifier per line. Save the case, confirm the listed public-index se
 | Names | Wikipedia name index and GDELT’s recent news index | Shared names and unrelated people can match. GDELT searches the last three months, with up to ten records per name; Wikipedia returns up to eight. |
 | Domain | Certificate Transparency and Internet Archive metadata | Existing records only; no live scan or archive submission. |
 | Public IP | Reviewed registry metadata | Allocation information does not identify an individual. |
-| Phone | Offline numbering-plan metadata | No owner identification or live verification. |
-| Username / email | Prepared index-search links | The report explicitly says these searches were not automatically run. |
+| Instagram / TikTok / VSCO | Platform-scoped Brave snippets if connected; prepared index queries otherwise | No profile visits, account-existence checks, media downloads or ownership verification. |
+| Phone | Offline numbering-plan metadata and optional Brave index snippets | No owner identification or live verification. |
+| Username / email | Brave index snippets when connected; prepared links otherwise | The report shows disconnected searches explicitly; no mailbox/account validation. |
 | Notes / reference URLs | Preserved as supplied context | Not automatically searched, visited or scraped. |
 | Selected notebook findings | Included with supplied-evidence labels | Not treated as independent verification or assumed to concern the same person. |
 
@@ -58,6 +60,12 @@ Exports contain the supplied identifiers and selected evidence. Cases, notes and
 
 ## Search connection and empty reports
 
-Version 2.5.1 can retrieve Brave index snippets for names, usernames, emails and phones when you supply and enable your own API key in **Search connection**. Without it, those general web searches are not run. Wikipedia and news cover only some names. Brave may require payment-card signup and charges beyond its limited monthly credits; review the provider plan. Keys are held only in memory (or an environment variable managed by you), never in the case database. Original pages are not fetched.
+Version 2.6.0 can retrieve Brave index snippets for names, usernames, Instagram/TikTok/VSCO handles, emails and phones when you supply and enable your own API key in **Search connection**. Without it, those general web searches are not run. Wikipedia and news cover only some names. Brave may require payment-card signup and charges beyond its limited monthly credits; review the provider plan. Keys are held only in memory (or an environment variable managed by you), never in the case database. Original pages are not fetched.
 
 A completed report means processing finished. Its outcome separately states whether online records were returned, sources failed, no search completed, or the completed indexes had no matches. Offline phone metadata is not an online match. Use **Check public sources** for canaries, then create a new report after fixing a connection; saved snapshots are immutable.
+
+## Social profile inputs
+
+Use the Instagram, TikTok or VSCO field for a handle (optionally beginning with `@`) or a full profile URL. Auto detect in Research recognizes supported profile URLs. VSCO `vsco.co/example-name/gallery` normalizes to `example-name`. Shared short links and individual post/video links must be replaced with full profile addresses. Profile URLs pasted only into **Reference URLs** stay context; use the platform field to run index searches.
+
+Each platform uses its own search scope and retains supplied canonical references in the report, without treating those addresses as retrieved evidence. Identical handles across platforms are separate inputs and do not establish common ownership. Older saved cases load with empty new fields. Previous report snapshots remain unchanged; generate a new one to include new profiles.

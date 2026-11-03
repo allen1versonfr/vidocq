@@ -13,9 +13,10 @@ from urllib.parse import urlparse,urlencode
 from version import VERSION
 from phone_lookup import inspect_phone
 from web_search import outcome
+from social_profiles import PLATFORMS,normalize_profile,profile_reference
 
-FIELDS=('names','usernames','emails','phones','domains','ips','urls')
-LIMITS={'names':3,'usernames':5,'emails':5,'phones':5,'domains':5,'ips':5,'urls':10}
+FIELDS=('names','usernames','emails','phones','domains','ips','instagram','tiktok','vsco','urls')
+LIMITS={'names':3,'usernames':5,'emails':5,'phones':5,'domains':5,'ips':5,'urls':10,'instagram':5,'tiktok':5,'vsco':5}
 CAUTION='Records are search results or supplied evidence, not verified identity matches. Shared names, reassigned phone numbers, stale records, and unrelated people can produce false matches. This report covers the listed inputs and supported sources, not everything on the internet.'
 
 def process_alive(pid):
@@ -64,7 +65,8 @@ def clean_case(payload,normalize):
         for value in values:
             if not isinstance(value,str) or not value.strip() or len(value)>2000 or any(ord(c)<32 for c in value):raise ValueError(f'Invalid {field} entry.')
             value=value.strip()
-            if field=='phones':value=inspect_phone(value,region)['e164']
+            if field in PLATFORMS:value=normalize_profile(field,value)
+            elif field=='phones':value=inspect_phone(value,region)['e164']
             elif field=='urls':
                 if not safe_reference(value):raise ValueError('Reference URLs must be http(s) addresses without credentials.')
             elif field in ('names','usernames'):
@@ -76,7 +78,7 @@ def clean_case(payload,normalize):
         result[field]=cleaned
         if field!='urls':total+=len(cleaned)
     if total>15:raise ValueError('Use up to 15 searchable identifiers per case. Reference URLs and notes are additional context.')
-    if not total:raise ValueError('Add at least one name, username, email, phone, domain, or public IP.')
+    if not total:raise ValueError('Add at least one name, username, social profile, email, phone, domain, or public IP.')
     ids=payload.get('notebook_ids',[])
     if not isinstance(ids,list) or len(ids)>30 or any(not isinstance(x,str) or not re.fullmatch('[0-9a-f]{24}',x) for x in ids):raise ValueError('Choose up to 30 valid notebook findings.')
     result['notebook_ids']=list(dict.fromkeys(ids))
@@ -103,7 +105,9 @@ class CaseService:
     def get(self,key):
         with self.database() as db:row=db.execute('SELECT data FROM cases WHERE id=?',(key,)).fetchone()
         if not row:raise ValueError('Case not found.')
-        return json.loads(row[0])
+        data=json.loads(row[0])
+        for field in FIELDS:data.setdefault(field,[])
+        return data
     def update(self,key,payload):
         previous=self.get(key)
         data=clean_case(payload,self.normalize)
@@ -135,7 +139,8 @@ class CaseService:
                     if row:supplied.append(json.loads(row[0]))
             run={'id':secrets.token_hex(12),'case_id':key,'case':copy.deepcopy(case),'supplied_findings':supplied,
                 'version':VERSION,'owner_pid':os.getpid(),'created_at':now(),'status':'queued','completed':0,'total':0,'message':'Preparing report…','records':[],
-                'coverage':[],'prepared_searches':[],'phone_metadata':[],'limitations':[CAUTION,'Phone, email and username ownership is not verified. No calls, messages, account checks, direct profile visits or live target scans are performed.','Reference URLs and notes are context only. Original URLs are never fetched. Search links are prepared but not automatically run.']}
+                'social_profiles':[{'platform':platform,'handle':handle,'reference':profile_reference(platform,handle),'status':'User supplied; not visited or verified'} for platform in PLATFORMS for handle in case.get(platform,[])],
+                'coverage':[],'prepared_searches':[],'phone_metadata':[],'limitations':[CAUTION,'Social profile, phone, email and username ownership is not verified. No calls, messages, account checks, direct profile visits or live target scans are performed.','Reference URLs and notes are context only. Original URLs are never fetched. Search links are prepared but not automatically run.']}
             with self.database() as db:db.execute('INSERT INTO case_runs VALUES (?,?,?)',(run['id'],key,json.dumps(run)))
             self.active=run['id']
             threading.Thread(target=self._execute,args=(run,),daemon=True).start()
@@ -145,7 +150,7 @@ class CaseService:
             case=run['case'];tasks=[]
             for field in FIELDS:
                 if field=='urls':continue
-                for value in case[field]:tasks.append((field,value))
+                for value in case.get(field,[]):tasks.append((field,value))
             run.update(status='running',total=len(tasks),message='Searching supported sources…');self._save_run(run)
             records={}
             def record(provider,source,title,detail,seed,origin='retrieved',reference=''):
@@ -169,6 +174,7 @@ class CaseService:
                         report=self.research('phone',value)
                         report['results']=[x for x in report.get('results',[]) if x['provider']!='Offline phone metadata']
                         run['coverage'].append({'seed':seed,'provider':'Offline phone metadata','status':'ok','count':1,'message':'No live phone or owner lookup was performed.'})
+                    elif field in PLATFORMS:report=self.research(field,value)
                     elif field=='names':report=self.research('person',value)
                     else:report=self.research({'usernames':'username','emails':'email','domains':'domain','ips':'ip'}[field],value)
                     run['prepared_searches'].extend(dict(link,seed=seed,executed=False) for link in report.get('links',[]))
@@ -198,7 +204,7 @@ def report_markdown(run):
     def block(value):return '\n'.join('    '+line for line in str(value).splitlines())+'\n'
     lines=['# Vidocq case report', '',block(run['case']['title']), 'Generated: '+str(run.get('finished_at',run['created_at'])),
         'App version: '+run['version'],'Status: '+run['status'],block(run.get('message','')),'', '## Scope and uncertainty','',CAUTION,'', '## Summary','',block(json.dumps(run.get('summary',{}),indent=2)),
-        '## Supplied context','',block(json.dumps(run['case'],ensure_ascii=False,indent=2)),'## Source coverage','']
+        '## Supplied context','',block(json.dumps(run['case'],ensure_ascii=False,indent=2)),'## Supplied social profiles','',block(json.dumps(run.get('social_profiles',[]),ensure_ascii=False,indent=2)),'## Source coverage','']
     for item in run['coverage']:lines.extend([block(json.dumps(item,ensure_ascii=False)), ''])
     lines.extend(['## Evidence and citations',''])
     for item in run['records']:
@@ -216,5 +222,6 @@ def report_html(run):
     coverage=''.join('<tr><td>'+e(x['seed'])+'</td><td>'+e(x['provider'])+'</td><td>'+e(x['status'])+'</td><td>'+e(x['count'])+'</td><td>'+e(x.get('message',''))+'</td></tr>' for x in run['coverage'])
     searches=''.join('<li><strong>'+e(x['title'])+'</strong><p>'+e(x['seed'])+'</p><code>'+e(x['url'])+'</code></li>' for x in run['prepared_searches'])
     summary_text=('Processed '+str(summary.get('inputs',run['completed']))+' identifiers. '+str(summary.get('retrieved_records',0))+' records were retrieved from supported indexes, '+str(summary.get('offline_records',0))+' were offline metadata, and '+str(summary.get('supplied_records',0))+' were supplied notebook findings. '+str(summary.get('source_errors',0))+' source operations failed; '+str(summary.get('prepared_not_run',len(run['prepared_searches'])))+' browser searches were prepared but not run.')
+    social='<h2>Supplied social profiles</h2>'+(''.join('<p>'+e(p['platform'])+' · @'+e(p['handle'])+'<br>'+e(p['reference'])+'<br>'+e(p['status'])+'</p>' for p in run.get('social_profiles',[])) or '<p>No platform profiles supplied.</p>')
     context='<dl>'+''.join('<dt>'+e(field.replace('_',' ').title())+'</dt><dd>'+e('\n'.join(value) if isinstance(value,list) else value)+'</dd>' for field,value in run['case'].items() if field not in ('id','notebook_ids','created_at') and value)+'</dl>'
-    return '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'"><title>'+title+' · Vidocq report</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:1000px;margin:40px auto;padding:24px;color:#172638}h1,h2,h3{line-height:1.2}h2{margin-top:36px;border-bottom:1px solid #ccd5df;padding-bottom:12px}p,dd,code,pre{white-space:pre-wrap;overflow-wrap:anywhere}article{padding:20px;border:1px solid #ccd5df;margin:16px 0;break-inside:avoid}dt{font-weight:bold}dd{margin:0 0 8px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccd5df;padding:8px;text-align:left;overflow-wrap:anywhere}aside{padding:20px;background:#fff3d8}@media print{body{margin:0;max-width:none;padding:8px;font-size:11px}h2{break-after:avoid}}</style><header><p>VIDOCQ · CASE REPORT · '+e(run['version'])+'</p><h1>'+title+'</h1><p>'+e(run.get('finished_at',run['created_at']))+' · '+e(run['status'])+'</p><p>'+e(run.get('message',''))+'</p></header><aside>'+e(CAUTION)+'</aside><h2>Summary</h2><p>'+e(summary_text)+'</p><h2>Supplied context</h2>'+context+'<h2>Source coverage</h2><table><thead><tr><th>Input</th><th>Provider</th><th>Status</th><th>Records</th><th>Notes</th></tr></thead><tbody>'+coverage+'</tbody></table><h2>Evidence and citations</h2>'+ (evidence or '<p>No records were returned. See the source coverage for empty results, failures and unsupported searches.</p>')+'<h2>Prepared searches — not run</h2><ul>'+searches+'</ul><h2>Limitations</h2><ul>'+''.join('<li>'+e(x)+'</li>' for x in run['limitations'])+'</ul><p>This export contains the supplied case details. Store and share it deliberately. Use your browser’s Print command to save a PDF.</p></html>'
+    return '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'"><title>'+title+' · Vidocq report</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:1000px;margin:40px auto;padding:24px;color:#172638}h1,h2,h3{line-height:1.2}h2{margin-top:36px;border-bottom:1px solid #ccd5df;padding-bottom:12px}p,dd,code,pre{white-space:pre-wrap;overflow-wrap:anywhere}article{padding:20px;border:1px solid #ccd5df;margin:16px 0;break-inside:avoid}dt{font-weight:bold}dd{margin:0 0 8px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccd5df;padding:8px;text-align:left;overflow-wrap:anywhere}aside{padding:20px;background:#fff3d8}@media print{body{margin:0;max-width:none;padding:8px;font-size:11px}h2{break-after:avoid}}</style><header><p>VIDOCQ · CASE REPORT · '+e(run['version'])+'</p><h1>'+title+'</h1><p>'+e(run.get('finished_at',run['created_at']))+' · '+e(run['status'])+'</p><p>'+e(run.get('message',''))+'</p></header><aside>'+e(CAUTION)+'</aside><h2>Summary</h2><p>'+e(summary_text)+'</p><h2>Supplied context</h2>'+context+social+'<h2>Source coverage</h2><table><thead><tr><th>Input</th><th>Provider</th><th>Status</th><th>Records</th><th>Notes</th></tr></thead><tbody>'+coverage+'</tbody></table><h2>Evidence and citations</h2>'+ (evidence or '<p>No records were returned. See the source coverage for empty results, failures and unsupported searches.</p>')+'<h2>Prepared searches — not run</h2><ul>'+searches+'</ul><h2>Limitations</h2><ul>'+''.join('<li>'+e(x)+'</li>' for x in run['limitations'])+'</ul><p>This export contains the supplied case details. Store and share it deliberately. Use your browser’s Print command to save a PDF.</p></html>'

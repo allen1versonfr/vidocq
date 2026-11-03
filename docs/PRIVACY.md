@@ -26,7 +26,8 @@ There is no built-in notebook cloud sync or analytics. The default data director
 | Domain research | Internet Archive and crt.sh receive the submitted domain. |
 | IP research | The reviewed registry endpoint receives the submitted public IP. |
 | Name / case research | Wikipedia receives the name; GDELT receives an exact-phrase name query against its recent news index. No original article is fetched. |
-| Optional general web search | When enabled with your key, Brave receives exact-phrase name, username, email or phone queries, including case inputs. Only API snippets are retrieved; no original page or thumbnail is fetched. |
+| Instagram / TikTok / VSCO | Supplied handles and canonical references stay in the local case/report. With Brave enabled, platform-scoped handle queries go to Brave only. Prepared browser links go to the chosen search engine when clicked. No profile, post, image or video is fetched and no account availability or ownership is tested. |
+| Optional general web search | When enabled with your key, Brave receives exact-phrase name, username, email or phone queries and scoped Instagram/TikTok/VSCO handle queries, including case inputs. Only API snippets are retrieved; no original page or thumbnail is fetched. |
 | Public source health check | Wikipedia receives Ada Lovelace and ARIN receives 8.8.8.8; no case details are sent. |
 | Phone analysis | Offline metadata only; no calls, texts or owner/account checks. Prepared search URLs include the number, but are not automatically opened. |
 | Topic research | Wikipedia receives the search term. |
