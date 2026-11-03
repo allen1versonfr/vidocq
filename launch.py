@@ -15,6 +15,9 @@ log = (data/'startup.log').open('w', encoding='utf-8', buffering=1)
 sys.stdout = log
 sys.stderr = log
 try:
+    if os.name=='nt':
+        # Stable taskbar grouping, independent of Python or PyInstaller defaults.
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('Vidocq.Desktop')
     import app
     app.main()
 except Exception:
