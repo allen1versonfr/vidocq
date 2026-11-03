@@ -40,12 +40,13 @@ Use `python app.py` for the native window when the necessary GUI runtime is avai
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 node --check ui/app.js
+node --check ui/investigation.js
 .\build_windows.bat
 ```
 
 The build script installs the pinned runtime dependencies and PyInstaller, generates the Windows ICO, runs the Python suite, embeds the icon and builds `dist\Vidocq.exe`, and runs Windows smoke checks. Node.js is needed for the separate frontend syntax command and is present in the GitHub runner.
 
-The 2.6.0 suite contains 98 automated tests. Frozen Windows checks validate exact embedded icon frames, bundled imports/UI assets/database access, social profile Research/case/report/export APIs, executable replacement and restart, and recovery after an invalid replacement cannot launch. They do not manually exercise the interactive native window. See [VALIDATION.md](../VALIDATION.md).
+The 2.7.0 suite includes investigation preservation, relationships, timelines, OCR, report comparison and encrypted restore tests alongside the original suite. Frozen Windows checks validate exact embedded icon frames, bundled imports/UI assets/database access, social profile Research/case/report/export APIs, executable replacement and restart, and recovery after an invalid replacement cannot launch. They do not manually exercise the interactive native window. See [VALIDATION.md](../VALIDATION.md).
 
 Use `VIDOCQ_DATA` pointing to a disposable directory for development so tests and manual experiments do not use your everyday notebook.
 

@@ -1,3 +1,13 @@
+# 2.7.0 — Investigation workspace
+
+- Preserve structured evidence and attachments separately from editable assessments; retain notebook compatibility and assessment history.
+- Add notebook editing, tags, case/entity filters, search and potential-duplicate review.
+- Add evidence-backed relationships, explicit entity merge/split operations and event timelines.
+- Compare completed report snapshots with source coverage and absence caveats.
+- Import PDF/text/screenshots with local Windows OCR, original-file preservation and page/passage citations.
+- Export encrypted or plain complete workspace bundles with validated, transactional restore.
+- Snapshot case-linked analyst assertions in reports and include them in exports.
+
 # Changelog
 
 Changes documented from the releases created for this repository.

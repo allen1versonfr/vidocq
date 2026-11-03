@@ -24,7 +24,11 @@
 
 Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-The current Windows release is **2.6.0**. Its 98 automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+The current Windows release is **2.7.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+
+## New investigation workspace
+
+Structured evidence, editable/searchable notebooks, evidence-backed entity relationships, timelines, snapshot comparisons, local PDF/screenshot OCR, and encrypted workspace backup/restore are now included. [Investigation guide →](docs/INVESTIGATION.md)
 
 ## What you can do
 

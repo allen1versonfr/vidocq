@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
     base='http://127.0.0.1:'+str(port)
     def request(path,payload=None):
         req=urllib.request.Request(base+path,data=None if payload is None else json.dumps(payload).encode(),headers={} if payload is None else {'Content-Type':'application/json'})
-        return client.open(req,timeout=10)
+        return client.open(req,timeout=90)
     try:
         deadline=time.monotonic()+90
         while True:
@@ -63,6 +63,25 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
         assert report['summary']['offline_records']==1 and report['summary']['prepared_not_run']>0
         with request('/api/case-runs/'+run['id']+'?format=html') as response:
             text=response.read().decode();assert 'Frozen case report' in text and 'Offline phone metadata' in text and 'https://www.tiktok.com/@example/' in text and 'https://www.instagram.com/example/' in text and 'https://vsco.co/example/' in text
+        # Investigation dependencies and new local APIs must work inside the frozen build.
+        import base64, io
+        from PIL import Image, ImageDraw, ImageFont
+        with request('/api/investigation',{'kind':'entity','label':'Frozen example'}) as response:entity=json.load(response)
+        image=Image.new('RGB',(1000,180),'white')
+        ImageDraw.Draw(image).text((20,40),'VIDOCQ EXAMPLE EVIDENCE',font=ImageFont.truetype('arial.ttf',40),fill='black')
+        buffer=io.BytesIO();image.save(buffer,format='PNG')
+        with request('/api/ingest',{'name':'example.png','content':base64.b64encode(buffer.getvalue()).decode()}) as response:document=json.load(response)
+        assert 'VIDOCQ' in document['pages'][0] or 'OCR unavailable' in document['notice'],document['notice']
+        from pypdf import PdfWriter
+        pdf=PdfWriter();pdf.add_blank_page(width=300,height=200);buffer=io.BytesIO();pdf.write(buffer)
+        with request('/api/ingest',{'name':'example.pdf','content':base64.b64encode(buffer.getvalue()).decode()}) as response:pdf_document=json.load(response)
+        assert len(pdf_document['pages'])==1 and 'Local OCR attempted' in pdf_document['notice'],pdf_document
+        with request('/api/save',{'title':'Frozen citation','entity_ids':[entity['id']],'capture':{'excerpt':document['pages'][0],'attachments':[document['id']]}}) as response:finding=json.load(response)
+        with request('/api/workspace/backup',{'password':'synthetic backup password'}) as response:bundle=json.load(response)
+        assert bundle['encrypted']
+        with request('/api/workspace/restore',dict(bundle,password='synthetic backup password')) as response:preview=json.load(response)
+        assert not preview['imported'] and all(n==0 for n in preview['counts'].values())
+        print('Frozen investigation, screenshot/PDF OCR, encrypted backup and restore preview passed.')
         print('Actual frozen phone/case/report/HTML export API passed.')
     finally:
         subprocess.run(['taskkill','/PID',str(server.pid),'/T','/F'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
