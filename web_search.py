@@ -26,12 +26,14 @@ class WebSearch:
             if data['enabled'] and not self.key:raise ValueError('Enter a Brave Search API key before enabling web search.')
             self.enabled=data['enabled']
         return self.status()
-    def search(self,value):
+    def search(self,value,site=None):
+        if site is not None and site not in ('instagram.com','tiktok.com','vsco.co'):raise ValueError('Unsupported social index scope.')
         with self.lock:
             if not self.enabled or not self.key:raise SearchNotConfigured('Web search was not run: connect your own Brave Search API key in Search connection. Wikipedia/news indexes do not cover most people or identifiers.')
             if self.requests>=100:raise SearchLimit('Session search limit reached (100 API calls). Check your provider usage before reconnecting in a new app session.')
             key=self.key;self.requests+=1
         query='"'+str(value).replace('"','').replace('\\','')+'"'
+        if site:query='site:'+site+' '+query
         source='https://api.search.brave.com/res/v1/web/search?'+urlencode({'q':query,'count':10,'safesearch':'moderate','text_decorations':'false'})
         req=Request(source,headers={'User-Agent':'Vidocq/'+VERSION,'Accept':'application/json','X-Subscription-Token':key})
         try:
@@ -49,6 +51,7 @@ class WebSearch:
                 if not isinstance(item,dict):continue
                 url=str(item.get('url',''));p=urlparse(url)
                 if p.scheme not in ('https','http') or not p.hostname or p.username or p.password:continue
+                if site and not (p.hostname==site or p.hostname.endswith('.'+site)):continue
                 text=lambda x:html.unescape(re.sub('<[^>]+>','',str(x)))
                 rows.append({'title':text(item.get('title','Indexed page'))[:500],'detail':text(item.get('description','No index snippet supplied.'))[:4000], 'reference':url[:2000]})
             return source,rows
