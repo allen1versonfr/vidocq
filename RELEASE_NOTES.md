@@ -1,15 +1,16 @@
-## Vidocq 2.4.0 — Framework source catalog
+## Vidocq 2.5.0 — Phone analysis and case reports
 
-- Added a searchable, categorized OSINT Framework snapshot: 1,171 entries, including 1,040 labeled free/freemium by upstream. Paid entries and unknown pricing are separate filters.
-- Every catalog entry shows actual integration state, upstream status, registration/local-install flags, and limitations. A catalog listing is not a functioning provider integration.
-- Added Search indexed pages for the free-access entries: a Google site-index search, with no original-source visit, tool execution, scan submission, or account checks.
-- Added integrated Open Library topic/book metadata and prepared DuckDuckGo, Google Scholar, PubMed, Open Library, and Google Patents searches. No book covers or result-page assets load automatically.
-- Replaced the old blanket-exclusion report with a per-entry coverage report. Included the upstream revision, checksum, sync script, and MIT license.
-- Bundled the catalog with the executable for offline directory browsing. GitHub self-updates and notebook migration are preserved.
-- 53 automated tests plus Windows frozen executable/replacement/restart/rollback checks gate publication.
+- Added Phone analysis for international/national normalization, country calling code, numbering region, number type, allocation region and original carrier metadata. This is offline numbering-plan data, not an owner lookup or live location/carrier check.
+- Added Cases & reports: supply names, usernames, emails, phones, domains, public IPs, reference URLs, notes and explicitly selected notebook evidence together.
+- Added background report runs, progress, persistent cases, editable inputs and immutable report snapshots.
+- Names search Wikipedia and GDELT’s recent news index. Existing domain/IP index adapters are retained. No original article, profile or reference URL is fetched.
+- Reports separate retrieved records, offline metadata, supplied evidence, errors, empty results and searches not automatically run. Records have source citations and unverified identity relevance; exact duplicates are consolidated without claiming identity or independent corroboration.
+- Export printable, self-contained HTML, Markdown and JSON. Open HTML and use Print → Save as PDF.
+- Updated updater/repository references after the rename to allen1versonfr/vidocq.
+- 72 automated tests plus actual Windows frozen app, phone/case/report/export and updater replacement/restart/rollback checks gate publication.
 
-### Coverage boundary
-The framework labels 784 entries free, 249 freemium, 7 mixed free/freemium, 30 paid, and 101 unknown. These labels are not individual live pricing or availability verification. Vidocq does not automatically run all of these tools. Only its reviewed adapters retrieve results internally; other catalog entries offer index searches. This preserves the requested restriction against target-contact/notification-prone sources.
+### Coverage limits
+Email, username and phone web searches remain prepared browser links, not automatic owner/account searches. Phone metadata does not identify a person or live location. A report covers the listed supported searches and supplied context, not everything on the internet. Common names, number reassignment and stale indexes can cause false matches. No calls, SMS, account checks, live target scans, facial identification or unconsented image uploads are added.
 
-### Updating
-Use Updates in Vidocq 2.3.0 or newer, with a Contents: read token while the repository is private. The original 2.2.1 executable still requires one manual replacement.
+### Use it
+Update from the Updates tab, then open Cases & reports. Choose a phone region for national numbers, enter one identifier per line, save the case, confirm the listed index requests and generate a report. For image findings, use Image search, save relevant results to Notebook and select those findings in the case. Cases/reports and exported identifiers are not encrypted by the app.
