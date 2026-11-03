@@ -1,6 +1,7 @@
 """Vidocq Desktop. Local UI; allowlisted third-party indexes only."""
 import argparse
 import concurrent.futures
+from contextlib import closing
 import html
 import ipaddress
 import json
@@ -171,9 +172,17 @@ def research(kind,value):
     return {'kind':kind,'query':value,'searched_at':datetime.now(timezone.utc).isoformat(),'results':results,'links':prepared_links(kind,value),'mode':'Third-party indexes only','notice':'No target-owned website, profile, DNS server, or IP is queried directly. Providers may log requests. There is no guarantee of anonymity or absence of notification.'}
 
 
+class NotebookConnection(sqlite3.Connection):
+    def __exit__(self, *args):
+        try:
+            return super().__exit__(*args)
+        finally:
+            self.close()
+
+
 def db():
     DATA.mkdir(parents=True,exist_ok=True)
-    c=sqlite3.connect(DATA/'workspace.sqlite3',timeout=5)
+    c=sqlite3.connect(DATA/'workspace.sqlite3',timeout=5,factory=NotebookConnection)
     c.execute('CREATE TABLE IF NOT EXISTS findings (id TEXT PRIMARY KEY, data TEXT NOT NULL)')
     return c
 
@@ -281,7 +290,7 @@ def migrate_legacy_data(destination=None, base=None):
         legacy=base/old_name/'workspace.sqlite3'
         if legacy.exists():
             destination.mkdir(parents=True,exist_ok=True)
-            with sqlite3.connect(legacy) as old, sqlite3.connect(destination/'workspace.sqlite3') as new:old.backup(new)
+            with closing(sqlite3.connect(legacy)) as old, closing(sqlite3.connect(destination/'workspace.sqlite3')) as new:old.backup(new)
             return
 
 
