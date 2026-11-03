@@ -77,6 +77,16 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
         with request('/api/ingest',{'name':'example.pdf','content':base64.b64encode(buffer.getvalue()).decode()}) as response:pdf_document=json.load(response)
         assert len(pdf_document['pages'])==1 and 'Local OCR attempted' in pdf_document['notice'],pdf_document
         with request('/api/save',{'title':'Frozen citation','entity_ids':[entity['id']],'capture':{'excerpt':document['pages'][0],'attachments':[document['id']]}}) as response:finding=json.load(response)
+        sf_rows=[{'data':'example.com','event_type':'DOMAIN_NAME','module':'sfp_example','source_data':'','false_positive':0,'last_seen':'2026-01-01 00:00:00','scan_name':'Frozen import','scan_target':'example.com'}, {'data':'192.0.2.1','event_type':'IP_ADDRESS','module':'sfp_example','source_data':'example.com','false_positive':0,'last_seen':'2026-01-01 00:00:01','scan_name':'Frozen import','scan_target':'example.com'}]
+        sf_payload={'name':'example-SpiderFoot.json','content':base64.b64encode(json.dumps(sf_rows).encode()).decode()}
+        with request('/api/import/spiderfoot',sf_payload) as response:sf_preview=json.load(response)
+        assert not sf_preview['imported'] and sf_preview['new_records']['findings']==2
+        with request('/api/import/spiderfoot',dict(sf_payload,confirm=True)) as response:sf_import=json.load(response)
+        assert sf_import['imported'] and sf_import['new_records']['relationships']==1
+        with request('/api/import/spiderfoot',sf_payload) as response:sf_repeat=json.load(response)
+        assert all(n==0 for n in sf_repeat['new_records'].values())
+        with request('/spiderfoot.js') as response:assert response.status==200
+        print('Frozen SpiderFoot preview/import/re-import and frontend asset passed.')
         with request('/api/workspace/backup',{'password':'synthetic backup password'}) as response:bundle=json.load(response)
         assert bundle['encrypted']
         with request('/api/workspace/restore',dict(bundle,password='synthetic backup password')) as response:preview=json.load(response)
