@@ -174,12 +174,13 @@ def apply_update(job_file):
     backup = target.with_name(target.name + '.previous')
     result = Path(job['result'])
     ready = Path(job['ready'])
-    moved, installed, child = False, False, None
+    moved, parent_done, child = False, False, None
     try:
         if not target.is_absolute() or target.suffix.lower() != '.exe' or staged.resolve() == target.resolve():
             raise ValueError('Invalid update paths.')
         verify_executable(staged, job['size'], job['sha256'])
         wait_for_parent(job['parent_pid'])
+        parent_done = True
         # Copy beside the target first, so installation uses an atomic same-volume rename.
         candidate = target.with_name(target.name + '.incoming')
         shutil.copyfile(staged, candidate)
@@ -187,7 +188,6 @@ def apply_update(job_file):
         replace_retry(target, backup)
         moved = True
         replace_retry(candidate, target)
-        installed = True
         ready.unlink(missing_ok=True)
         env = dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT='1')
         child = subprocess.Popen([str(target), *job.get('launch_args', []), '--update-ready', str(ready)], cwd=str(target.parent), env=env)
@@ -202,14 +202,16 @@ def apply_update(job_file):
         return 0
     except Exception:
         if child and child.poll() is None:
-            child.terminate()
+            if os.name == 'nt':
+                subprocess.run(['taskkill', '/PID', str(child.pid), '/T', '/F'],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            else:
+                child.terminate()
             child.wait(timeout=15)
         if moved:
-            if installed:
-                target.unlink(missing_ok=True)
             replace_retry(backup, target)
         result.write_text(json.dumps({'status': 'failed', 'message': 'Update could not finish. The previous version was preserved. Check folder write permissions and try again.'}), encoding='utf-8')
-        if moved:
+        if parent_done:
             subprocess.Popen([str(target), *job.get('launch_args', [])], cwd=str(target.parent), env=dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT='1'))
         return 1
 
