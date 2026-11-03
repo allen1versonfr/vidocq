@@ -1,16 +1,15 @@
-## Vidocq 2.3.0 — GitHub updates
+## Vidocq 2.4.0 — Framework source catalog
 
-- Added an Updates tab and automatic checks for newer stable GitHub releases at launch.
-- Download updates inside Vidocq with progress, then choose Install and restart.
-- Verifies the exact download size and GitHub SHA-256 digest before replacing the executable.
-- Uses a separate updater process; keeps the previous executable and restores it if the new app fails to start.
-- Preserves notebooks and existing legacy-data migration.
-- Supports private-repository updates using an optional Contents: read GitHub token kept only in memory, or VIDOCQ_GITHUB_TOKEN on your computer. No token is bundled in the app.
-- Replaced the temporary self-extracting launcher with a single portable Windows executable that can replace itself reliably.
-- Added a repeatable Windows build and release pipeline with frozen-app, replacement/restart, and rollback tests.
+- Added a searchable, categorized OSINT Framework snapshot: 1,171 entries, including 1,040 labeled free/freemium by upstream. Paid entries and unknown pricing are separate filters.
+- Every catalog entry shows actual integration state, upstream status, registration/local-install flags, and limitations. A catalog listing is not a functioning provider integration.
+- Added Search indexed pages for the free-access entries: a Google site-index search, with no original-source visit, tool execution, scan submission, or account checks.
+- Added integrated Open Library topic/book metadata and prepared DuckDuckGo, Google Scholar, PubMed, Open Library, and Google Patents searches. No book covers or result-page assets load automatically.
+- Replaced the old blanket-exclusion report with a per-entry coverage report. Included the upstream revision, checksum, sync script, and MIT license.
+- Bundled the catalog with the executable for offline directory browsing. GitHub self-updates and notebook migration are preserved.
+- 53 automated tests plus Windows frozen executable/replacement/restart/rollback checks gate publication.
 
-### First upgrade
-The old 2.2.1 executable predates the updater: download this Vidocq.exe once and replace the old one. Future stable releases can be installed from Updates. This repository is private, so authenticated read access is required for update checks and downloads.
+### Coverage boundary
+The framework labels 784 entries free, 249 freemium, 7 mixed free/freemium, 30 paid, and 101 unknown. These labels are not individual live pricing or availability verification. Vidocq does not automatically run all of these tools. Only its reviewed adapters retrieve results internally; other catalog entries offer index searches. This preserves the requested restriction against target-contact/notification-prone sources.
 
-### Requirements
-Windows 10/11 x64; Microsoft Edge WebView2 Runtime for the native window. Browser fallback is supported. Keep the portable executable in a writable folder. Unsigned executable; no administrator permission is requested by the updater.
+### Updating
+Use Updates in Vidocq 2.3.0 or newer, with a Contents: read token while the repository is private. The original 2.2.1 executable still requires one manual replacement.

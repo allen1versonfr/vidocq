@@ -3,8 +3,8 @@ const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,
 let latest=null,saved=[];
 async function api(path,data){const r=await fetch('/api/'+path,data===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});const d=await r.json();if(!r.ok)throw Error(d.error||'Request failed.');return d}
 function toast(t){$('toast').textContent=t;$('toast').style.display='block';clearTimeout(window.tt);window.tt=setTimeout(()=>$('toast').style.display='none',4000)}
-function view(v){for(const id of ['research','image','notebook','sources','updates']){$(id).hidden=id!==v;$(id+'-tab').classList.toggle('active',id===v)}if(v==='notebook')loadFindings()}
-for(const id of ['research','image','notebook','sources','updates'])$(id+'-tab').onclick=()=>view(id);
+function view(v){for(const id of ['research','image','notebook','sources','updates','catalog']){$(id).hidden=id!==v;$(id+'-tab').classList.toggle('active',id===v)}if(v==='notebook')loadFindings()}
+for(const id of ['research','image','notebook','sources','updates','catalog'])$(id+'-tab').onclick=()=>view(id);
 function note(t,error=false){$('notice').className='notice'+(error?' error':'');$('notice').textContent=t}
 $('search-form').onsubmit=async e=>{e.preventDefault();$('submit').disabled=true;$('submit').textContent='Searching…';note('Checking third-party indexes. Nothing is sent to the submitted domain, IP, or account.');$('results').innerHTML='';try{latest=await api('research',{kind:$('kind').value,value:$('value').value});render();note('Finished. '+latest.notice)}catch(x){latest=null;note(x.message,true)}finally{$('submit').disabled=false;$('submit').textContent='Research →'}};
 function render(){const d=latest;let total=d.results.reduce((a,r)=>a+r.rows.length,0);$('results').innerHTML=`<div class="result-head"><div class="eyebrow">${esc(d.kind.toUpperCase())} · ${esc(d.searched_at)}</div><h2>${esc(d.query)}</h2><p>${total} returned records · ${d.results.length} integrated sources · ${d.links.length} prepared searches</p></div>${d.results.length?'':'<div class="notice">This input uses search-index links only. No account lookup or account-existence test was performed.</div>'}${d.results.map((r,i)=>`<article class="provider"><div class="provider-header"><h3>${esc(r.provider)}</h3><span class="pill ${esc(r.status)}">${r.status==='ok'?'Records returned':r.status==='empty'?'No records returned':'Unavailable'}</span></div><p>${esc(r.message||'Existing third-party records. These do not establish identity, ownership, or current availability.')}</p>${r.rows.map((row,j)=>`<div class="record"><h4>${esc(row.title)}</h4><p>${esc(row.detail)}</p><button data-save="${i}:${j}">Save to notebook +</button></div>`).join('')}</article>`).join('')}<h3>Continue with a search index</h3><p class="hint">These open in your default browser only when clicked. The provider receives your query. Avoid opening original profiles or websites if you want to keep research passive.</p><div class="links">${d.links.map((l,i)=>`<button class="launch" data-open="${i}"><strong>${esc(l.title)} ↗</strong><span>${esc(l.note)}</span></button>`).join('')}</div>`}
@@ -44,3 +44,21 @@ $('update-download').onclick=()=>updateAction('download');
 $('update-install').onclick=()=>updateAction('install');
 async function pollUpdate(){try{showUpdate(await api('updates'))}catch(e){/* App may be restarting; leave the last status visible. */}setTimeout(pollUpdate,1500)}
 pollUpdate();
+
+let catalogOffset=0,catalogTotal=0,catalogTimer=0,catalogRequest=0;
+async function loadCatalog(){
+ const requestId=++catalogRequest;
+ const params=new URLSearchParams({q:$('catalog-filter').value,category:$('catalog-category').value,pricing:$('catalog-pricing').value,mode:$('catalog-mode').value,offset:String(catalogOffset)});
+ try{const d=await api('catalog?'+params);if(requestId!==catalogRequest)return;catalogTotal=d.total;
+  if($('catalog-category').options.length===1)for(const c of d.categories){const o=document.createElement('option');o.value=c;o.textContent=c;$('catalog-category').append(o)}
+  $('catalog-summary').textContent=d.summary.entries+' framework entries · '+d.summary.free_access+' with upstream free-access metadata · snapshot '+d.provenance.retrieved_on;
+  $('catalog-page').textContent=d.total?(catalogOffset+1)+'–'+Math.min(catalogOffset+30,d.total)+' of '+d.total:'No matching sources';
+  $('catalog-prev').disabled=catalogOffset===0;$('catalog-next').disabled=catalogOffset+30>=d.total;
+  $('catalog-results').innerHTML=d.entries.map(x=>`<article class="provider"><div class="provider-header"><h3>${esc(x.name)}</h3><span class="pill">${esc(x.pricing)}</span></div><p class="eyebrow">${esc(x.category.join(' → '))}</p><p>${esc(x.description)}</p><p class="source-text">${esc(x.url)}</p><p><strong>${esc(x.integration)}</strong> · ${esc(x.reason)}</p><p class="hint">Upstream status: ${esc(x.upstream_status)} · ${x.registration?'Registration listed':'No registration flag'} · ${x.local_install?'Local installation listed':'Web resource'}</p>${x.cautions.length?`<details><summary>Source limitations</summary><p>${esc(x.cautions.join(' '))}</p></details>`:''}${['free','freemium','free/freemium'].includes(x.pricing)?`<button data-catalog-search="${esc(x.id)}" class="secondary">Search indexed pages</button>`:''}</article>`).join('')||'<p>No sources match these filters.</p>';
+ }catch(e){$('catalog-results').textContent=e.message}
+}
+for(const id of ['catalog-filter','catalog-category','catalog-pricing','catalog-mode'])$(id).addEventListener(id==='catalog-filter'?'input':'change',()=>{catalogOffset=0;clearTimeout(catalogTimer);catalogTimer=setTimeout(loadCatalog,200)});
+$('catalog-prev').onclick=()=>{catalogOffset=Math.max(0,catalogOffset-30);loadCatalog()};
+$('catalog-next').onclick=()=>{if(catalogOffset+30<catalogTotal){catalogOffset+=30;loadCatalog()}};
+$('catalog-results').onclick=async e=>{const b=e.target.closest('[data-catalog-search]');if(!b)return;try{await api('catalog/search',{id:b.dataset.catalogSearch,query:$('catalog-query').value});toast('Opened a Google index search. The provider tool was not run.')}catch(e){toast(e.message)}};
+loadCatalog();

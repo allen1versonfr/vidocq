@@ -27,10 +27,10 @@ ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
 DATA = Path(os.environ.get('VIDOCQ_DATA') or os.environ.get('ALL_SEEING_EYES_DATA') or os.environ.get('OSINT_DESK_DATA') or (Path(os.environ.get('LOCALAPPDATA', Path.home()/'.local/share')) / 'Vidocq'))
 EXIT_EVENT = threading.Event()
 UPDATES = UpdateManager(DATA)
-NETWORK_HOSTS = frozenset({'archive.org', 'crt.sh', 'en.wikipedia.org', 'rdap.arin.net', 'rdap.db.ripe.net', 'rdap.apnic.net', 'rdap.lacnic.net', 'rdap.afrinic.net'})
-LINK_HOSTS = NETWORK_HOSTS | {'www.google.com', 'www.bing.com', 'lookup.icann.org', 'stat.ripe.net'}
+NETWORK_HOSTS = frozenset({'archive.org', 'crt.sh', 'en.wikipedia.org', 'rdap.arin.net', 'rdap.db.ripe.net', 'rdap.apnic.net', 'rdap.lacnic.net', 'rdap.afrinic.net', 'openlibrary.org'})
+LINK_HOSTS = NETWORK_HOSTS | {'www.google.com', 'www.bing.com', 'lookup.icann.org', 'stat.ripe.net', 'duckduckgo.com', 'scholar.google.com', 'pubmed.ncbi.nlm.nih.gov', 'patents.google.com'}
 COOKIE = secrets.token_urlsafe(32)
-HEADERS = {'User-Agent': 'Vidocq/2.3.0 (public-index research; local desktop app)', 'Accept': 'application/json'}
+HEADERS = {'User-Agent': 'Vidocq/2.4.0 (public-index research; local desktop app)', 'Accept': 'application/json'}
 
 
 def check_provider_url(url, hosts=NETWORK_HOSTS):
@@ -108,6 +108,10 @@ def prepared_links(kind,value):
         links.append(link('RIPE public network records','https://stat.ripe.net/'+quote(value,safe=''),'Registry information; no scan of this address.'))
     elif kind=='topic':
         links.append(link('Wikipedia search','https://en.wikipedia.org/w/index.php?'+urlencode({'search':value}),'Public encyclopedia index.'))
+    links.append(link('DuckDuckGo indexed mentions','https://duckduckgo.com/?'+urlencode({'q':exact}),'Independent search index; opens only after a click.'))
+    if kind=='topic':
+        for title,base,key in [('Google Scholar','https://scholar.google.com/scholar','q'),('PubMed','https://pubmed.ncbi.nlm.nih.gov/','term'),('Open Library','https://openlibrary.org/search','q'),('Google Patents','https://patents.google.com/','q')]:
+            links.append(link(title,base+'?'+urlencode({key:value}),'Search this public index in your browser; no original source is opened by Vidocq.'))
     return links
 
 
@@ -142,6 +146,18 @@ def encyclopedia(value):
     return url,[{'title':p.get('title','Untitled'),'detail':html.unescape(re.sub('<[^>]+>','',p.get('description') or p.get('excerpt') or 'No description.'))} for p in data.get('pages',[])]
 
 
+def books(value):
+    url='https://openlibrary.org/search.json?'+urlencode({'q':value,'limit':8,'fields':'title,author_name,first_publish_year,key'})
+    data=get_json(url)
+    if not isinstance(data,dict) or not isinstance(data.get('docs'),list):raise ValueError('Unexpected Open Library response.')
+    rows=[]
+    for item in data['docs'][:8]:
+        if not isinstance(item,dict):continue
+        authors=item.get('author_name') or []
+        rows.append({'title':str(item.get('title') or 'Untitled')[:500], 'detail':'Authors: '+', '.join(map(str,authors[:5]))+' · First published: '+str(item.get('first_publish_year') or 'Unknown')})
+    return url,rows
+
+
 def network_registry(value):
     url='https://rdap.arin.net/registry/ip/'+quote(value,safe=':')
     d=get_json(url)
@@ -149,7 +165,7 @@ def network_registry(value):
     return url,rows
 
 
-ADAPTERS={'domain':[('Internet Archive index',archive),('Certificate Transparency index',certificates)],'ip':[('Regional Internet Registry',network_registry)],'topic':[('Wikipedia index',encyclopedia)]}
+ADAPTERS={'domain':[('Internet Archive index',archive),('Certificate Transparency index',certificates)],'ip':[('Regional Internet Registry',network_registry)],'topic':[('Wikipedia index',encyclopedia),('Open Library catalog',books)]}
 
 
 def run_adapter(name,fn,value):
@@ -219,6 +235,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get('Host')!=host:return self.send(403,{'error':'Localhost only.'})
         if self.path=='/':return self.send(200,(ROOT/'ui/index.html').read_bytes(),'text/html; charset=utf-8',cookie=True)
         if not self.authorized():return self.send(403,{'error':'Open the local app window first.'})
+        if urlparse(self.path).path=='/api/catalog':
+            from catalog import query_catalog
+            try:return self.send(200,query_catalog({k:v[0] for k,v in parse_qs(urlparse(self.path).query).items()}))
+            except ValueError as e:return self.send(400,{'error':str(e)})
         if self.path=='/api/updates':return self.send(200,UPDATES.status())
         if self.path=='/api/findings':
             with db() as c:rows=c.execute('SELECT data FROM findings ORDER BY rowid DESC').fetchall()
@@ -235,6 +255,11 @@ class Handler(BaseHTTPRequestHandler):
             if size<1 or size>(7_100_000 if self.path=='/api/image-search' else 200_000):raise ValueError('Invalid request size.')
             p=json.loads(self.rfile.read(size))
             if not isinstance(p,dict):raise ValueError('Invalid request.')
+            if self.path=='/api/catalog/search':
+                from catalog import indexed_source_url
+                url=indexed_source_url(p.get('id'),p.get('query'))
+                webbrowser.open(url)
+                return self.send(200,{'opened':True,'mode':'search-index-only'})
             if self.path=='/api/quit':
                 self.send(200,{'closing':True})
                 EXIT_EVENT.set()
@@ -277,7 +302,7 @@ def allowed_external(url):
     try:check_provider_url(url,LINK_HOSTS)
     except ValueError:return False
     p=urlparse(url)
-    return ((p.hostname in ('www.google.com','www.bing.com') and p.path=='/search') or (p.hostname=='crt.sh' and p.path=='/') or (p.hostname=='lookup.icann.org' and p.path=='/en/lookup') or (p.hostname=='stat.ripe.net' and p.path.count('/')==1) or (p.hostname=='en.wikipedia.org' and p.path=='/w/index.php'))
+    return ((p.hostname in ('www.google.com','www.bing.com') and p.path=='/search') or (p.hostname=='crt.sh' and p.path=='/') or (p.hostname=='lookup.icann.org' and p.path=='/en/lookup') or (p.hostname=='stat.ripe.net' and p.path.count('/')==1) or (p.hostname=='en.wikipedia.org' and p.path=='/w/index.php') or (p.hostname=='duckduckgo.com' and p.path=='/') or (p.hostname=='scholar.google.com' and p.path=='/scholar') or (p.hostname=='pubmed.ncbi.nlm.nih.gov' and p.path=='/') or (p.hostname=='openlibrary.org' and p.path=='/search') or (p.hostname=='patents.google.com' and p.path=='/'))
 
 
 def migrate_legacy_data(destination=None, base=None):
@@ -309,6 +334,8 @@ def main():
         from PIL import Image
         with db() as connection:connection.execute('SELECT count(*) FROM findings').fetchone()
         import updater, webview
+        from catalog import catalog
+        assert catalog()['summary']['entries'] == len(catalog()['entries'])
         assert (ROOT/'ui/index.html').is_file() and (ROOT/'ui/app.js').is_file()
         if args.smoke_test:args.smoke_test.write_text(json.dumps({'version':VERSION,'ok':True}),encoding='utf-8')
         if args.update_ready:args.update_ready.write_text(VERSION,encoding='utf-8')
