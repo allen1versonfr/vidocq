@@ -1,3 +1,7 @@
+# 2.14.0
+
+Added reviewed Chrome/Firefox capture helper, Photon JSON import, separately approved bounded public-link capture, query variants and historical aliases, cited link evidence, an Instagram checker hold/public GitHub canary, and optional local query/excerpt drafting. See docs/DISCOVERY_WORKBENCH.md for setup and limits.
+
 # 2.13.0
 
 Added profile/location planning fixes, per-site diagnostics, persistent account decisions, browser evidence capture, meaningful report counts and scoped preview/confirmation-based local cleanup. Added local LLM assessment; no model download.

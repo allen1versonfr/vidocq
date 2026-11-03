@@ -17,6 +17,7 @@ from social_profiles import PLATFORMS,normalize_profile,profile_reference
 from assisted_investigation import options as investigation_options, execute as execute_investigation, report_analysis_html, report_analysis_markdown
 from research_connectors import normalize_steam
 from discovery_review import locations,canonical_reference
+from discovery_tools import aliases
 
 FIELDS=('names','usernames','emails','phones','domains','ips','instagram','tiktok','vsco','steam','urls')
 LIMITS={'names':3,'usernames':5,'emails':5,'phones':5,'domains':5,'ips':5,'urls':10,'instagram':5,'tiktok':5,'vsco':5,'steam':5}
@@ -65,6 +66,7 @@ def clean_case(payload,normalize):
         if not isinstance(value,str) or len(value)>120 or any(ord(c)<32 for c in value):raise ValueError('Invalid '+field+' context.')
         result[field]=value.strip()
     result['locations']=locations(payload)
+    result['aliases']=aliases(payload.get('aliases',[]))
     total=0
     for field in FIELDS:
         values=payload.get(field,[])
@@ -126,6 +128,7 @@ class CaseService:
     def update(self,key,payload):
         previous=self.get(key)
         data=clean_case(payload,self.normalize)
+        if 'aliases' not in payload:data['aliases']=previous.get('aliases',[])
         data.update(id=key,created_at=previous['created_at'],account_decisions=previous.get('account_decisions',[]))
         with self.database() as db:db.execute('UPDATE cases SET data=?,updated_at=? WHERE id=?',(json.dumps(data),now(),key))
         return data
@@ -157,6 +160,15 @@ class CaseService:
         if not isinstance(query,str) or len(query)>1000:raise ValueError('Query must be at most 1,000 characters.')
         return save_finding({'title':title,'notes':'Manually reviewed browser evidence. Source text is user-supplied, not independently fetched or verified by Vidocq.','source':ref,'status':'Unverified lead','case_ids':[key],
             'capture':{'provider':'Browser evidence (user captured)','reference':ref,'query':query,'retrieved_at':now(),'excerpt':excerpt,'origin':'browser-capture'}})
+
+    def link_capture(self,key,data,save_finding):
+        self.get(key)
+        if len(json.dumps(data,ensure_ascii=False))>99000:raise ValueError('Evidence exceeds 99 KB; import fewer links.')
+        reference=data.get('reference') or (data.get('pages') or [{}])[0].get('reference','')
+        if not reference:raise ValueError('No successfully captured page to save.')
+        return save_finding({'title':data.get('title','Public link evidence'),'source':reference,'status':'Unverified lead','case_ids':[key],
+            'notes':'Published linkage or imported leads are not account ownership proof. Photon aggregate leads do not establish page-to-page linkage.',
+            'capture':{'provider':data['origin'],'reference':reference,'retrieved_at':now(),'excerpt':json.dumps(data,ensure_ascii=False),'origin':'public-links'}})
 
     def list(self):
         with self.database() as db:rows=db.execute('SELECT data FROM cases ORDER BY updated_at DESC LIMIT 100').fetchall()
@@ -193,7 +205,7 @@ class CaseService:
                 supplied_ids={f['id'] for f in supplied}
                 for raw, in db.execute('SELECT data FROM findings'):
                     finding=json.loads(raw)
-                    if finding.get('capture',{}).get('origin')=='browser-capture' and key in finding.get('case_ids',[]) and finding['id'] not in supplied_ids:
+                    if finding.get('capture',{}).get('origin') in ('browser-capture','public-links') and key in finding.get('case_ids',[]) and finding['id'] not in supplied_ids:
                         supplied.append(finding);supplied_ids.add(finding['id'])
                 if len(supplied)>60:raise ValueError('Use at most 60 supplied findings per run.')
                 if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='investigation_items'").fetchone():
