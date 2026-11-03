@@ -28,7 +28,7 @@ class BurnTests(unittest.TestCase):
         (runtime/'llama-server.exe').write_bytes(b'synthetic executable')
         (ai_root/'private-notes.txt').write_text('Preserve unrelated data')
         (self.root/'local-ai.json').write_text('{"enabled":false}')
-        plan=self.manager.preview();self.assertIn(str(model),[f['path'] for f in plan['files']])
+        plan=self.manager.preview();self.assertIn(model.resolve(),[Path(f['path']).resolve() for f in plan['files']])
         folder=self.helper(preserve_plan=True)
         try:
             self.assertFalse(model.exists());self.assertFalse((runtime/'llama-server.exe').exists());self.assertFalse((self.root/'local-ai.json').exists());self.assertTrue((ai_root/'private-notes.txt').exists());self.assertFalse(folder.exists())
@@ -37,7 +37,7 @@ class BurnTests(unittest.TestCase):
     @unittest.skipUnless(os.name=='nt','Windows helper')
     def test_ai_prefix_does_not_allow_deleting_unowned_files(self):
         unknown=self.root/'local-ai'/'unowned.txt';unknown.parent.mkdir();unknown.write_text('Preserve')
-        folder=self.helper(lambda p:p['files'].append({'path':str(unknown),'exists':True,'size':8}))
+        folder=self.helper(lambda p:p['files'].append({'path':str(unknown.resolve()),'exists':True,'size':8}))
         try:self.assertTrue(unknown.exists());self.assertTrue((folder/'failure.txt').exists());self.assertTrue((self.root/'workspace.sqlite3').exists())
         finally:shutil.rmtree(folder)
     def test_refuses_roots_and_source_executable_removal(self):
