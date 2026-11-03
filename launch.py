@@ -5,6 +5,12 @@ from pathlib import Path
 import sys
 import traceback
 
+if len(sys.argv)>1 and sys.argv[1]=='--maigret-companion':
+    sys.argv.pop(1)
+    from scripts.maigret_bridge import main
+    main()
+    raise SystemExit(0)
+
 if len(sys.argv) == 3 and sys.argv[1] == '--apply-update':
     from updater import apply_update
     raise SystemExit(apply_update(sys.argv[2]))

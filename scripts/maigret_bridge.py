@@ -43,7 +43,8 @@ class Bridge:
     def __init__(self):self.lock=threading.RLock();self.jobs={};self.cancelled=set()
     def about(self):
         import maigret
-        return {'service':'vidocq-maigret-bridge','protocol':1,'maigret_version':importlib.metadata.version('maigret'),'sites':list(MAIGRET_SITES),'public_checks_only':True}
+        _,available=site_selection(list(MAIGRET_SITES))
+        return {'available_sites':list(available.values()),'service':'vidocq-maigret-bridge','protocol':1,'maigret_version':importlib.metadata.version('maigret'),'sites':list(MAIGRET_SITES),'public_checks_only':True}
     def cancel(self,run_id):
         if not isinstance(run_id,str) or not re.fullmatch('[0-9a-f]{24}',run_id):raise ValueError('Invalid run ID.')
         with self.lock:
@@ -118,11 +119,14 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:return self.send(503,{'error':'Maigret could not complete this run. Check the companion installation.'})
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--port',type=int,default=8001);args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--port',type=int,default=8001);parser.add_argument('--parent-pid',type=int);args=parser.parse_args()
     key=os.environ.get('VIDOCQ_MAIGRET_BRIDGE_KEY','')
     if not re.fullmatch('[A-Za-z0-9._~-]{16,256}',key):raise SystemExit('Set VIDOCQ_MAIGRET_BRIDGE_KEY to a private 16–256 character token before starting.')
     if not 1024<=args.port<=65535:raise SystemExit('Choose a loopback port from 1024 to 65535.')
     server=ThreadingHTTPServer(('127.0.0.1',args.port),Handler);server.api_key=key;server.bridge=Bridge()
+    if args.parent_pid:
+        from managed_maigret import watch_parent
+        watch_parent(server,args.parent_pid)
     print('Vidocq Maigret companion listening on 127.0.0.1:'+str(args.port),flush=True)
     try:server.serve_forever()
     except KeyboardInterrupt:pass

@@ -40,11 +40,11 @@ def transport(url,payload=None,key=None,service='hibp',timeout=15):
 class AdditionalCollectors:
     def __init__(self):
         self.lock=threading.RLock();self.enabled={x:False for x in ('hibp','harvester','maigret')};self.keys={x:'' for x in self.enabled}
-        self.ports={'harvester':5000,'maigret':8001};self.counts={x:0 for x in self.enabled};self.next_hibp=0;self.cache={};self.pending={};self.cancelled=set()
+        self.ports={'harvester':5000,'maigret':8001};self.counts={x:0 for x in self.enabled};self.next_hibp=0;self.cache={};self.pending={};self.cancelled=set();self.manager=None;self.managed=False
 
     def status(self):
         with self.lock:return {**{k:{'enabled':self.enabled[k],'configured':bool(self.keys[k]),'port':self.ports.get(k),'session_requests':self.counts[k],'session_limit':100 if k=='hibp' else 20} for k in self.enabled},
-                               'hibp_attribution':HIBP_ATTRIBUTION,'harvester_sources':list(HARVESTER_SOURCES),'maigret_sites':list(MAIGRET_SITES)}
+                               'managed_maigret':self.manager.status() if self.manager else {'state':'stopped','running':False,'bundled':True},'hibp_attribution':HIBP_ATTRIBUTION,'harvester_sources':list(HARVESTER_SOURCES),'maigret_sites':list(MAIGRET_SITES)}
 
     def configure(self,p):
         with self.lock:
@@ -65,6 +65,16 @@ class AdditionalCollectors:
                     ports[kind]=value
             if keys['hibp']!=self.keys['hibp']:self.cache.clear()
             self.keys=keys;self.enabled=enabled;self.ports=ports
+        if 'maigret_key' in p:self.managed=False
+        if self.manager and (not enabled['maigret'] or not self.managed):self.manager.stop()
+        return self.status()
+
+    def setup_maigret(self):
+        from managed_maigret import ManagedMaigret
+        with self.lock:
+            if self.manager is None:self.manager=ManagedMaigret()
+            key,port=self.manager.ensure()
+            self.keys['maigret']=key;self.ports['maigret']=port;self.enabled['maigret']=True;self.managed=True
         return self.status()
 
     def _access(self,kind):
@@ -165,7 +175,11 @@ class AdditionalCollectors:
         import secrets
         username=username.removeprefix('@') if isinstance(username,str) else ''
         if not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}',username):raise ValueError('Maigret requires a supplied handle, not an email, name or URL.')
-        sites=selected(sites,MAIGRET_SITES,10);key,port=self._access('maigret');base='http://127.0.0.1:'+str(port)
+        sites=selected(sites,MAIGRET_SITES,10)
+        if self.manager and self.managed and self.enabled['maigret']:
+            key,port=self.manager.ensure()
+            with self.lock:self.keys['maigret']=key;self.ports['maigret']=port
+        key,port=self._access('maigret');base='http://127.0.0.1:'+str(port)
         about=transport(base+'/api/about',key=key,service='maigret')
         if not isinstance(about,dict) or about.get('service')!='vidocq-maigret-bridge' or about.get('protocol')!=1:raise ValueError('Start the compatible Vidocq Maigret companion on this loopback port.')
         job=secrets.token_hex(12)

@@ -1,3 +1,7 @@
+# 2.11.0
+
+Bundle Maigret and its site database; add one-click authenticated companion setup, automatic port/token selection, restart after child exit and lifecycle cleanup. Keep advanced manual-service configuration.
+
 # 2.10.0
 
 Added optional HIBP, passive HarvestView and scoped Maigret companion connections, case integration, attributed exports, cancellation and partial coverage. See docs/ADDITIONAL_COLLECTORS.md.

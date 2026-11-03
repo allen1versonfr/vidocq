@@ -350,6 +350,7 @@ class Handler(BaseHTTPRequestHandler):
             if size<1 or size>limit:raise ValueError('Invalid request size.')
             p=json.loads(self.rfile.read(size))
             if not isinstance(p,dict):raise ValueError('Invalid request.')
+            if self.path=='/api/collectors/maigret/setup':return self.send(200,COLLECTORS.setup_maigret())
             if self.path=='/api/collectors':return self.send(200,COLLECTORS.configure(p))
             if self.path=='/api/collectors/lookup':
                 if p.get('consent') is not True:raise ValueError('Confirm the selected collector activity.')
@@ -486,7 +487,9 @@ def main():
     if args.serve_only:
         try:server.serve_forever()
         except KeyboardInterrupt:pass
-        finally:server.server_close()
+        finally:
+            if COLLECTORS.manager:COLLECTORS.manager.stop()
+            server.server_close()
         return
     threading.Thread(target=server.serve_forever,daemon=True).start()
     UPDATES.check()
@@ -515,7 +518,9 @@ def main():
                 mark_ready()
                 EXIT_EVENT.wait()
     except KeyboardInterrupt:pass
-    finally:server.shutdown();server.server_close()
+    finally:
+        if COLLECTORS.manager:COLLECTORS.manager.stop()
+        server.shutdown();server.server_close()
 
 
 if __name__=='__main__':main()

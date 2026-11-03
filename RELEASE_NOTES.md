@@ -1,9 +1,7 @@
-# Vidocq 2.10.0 - Additional investigation sources
+# Vidocq 2.11.0 - Automatic Maigret setup
 
-- Have I Been Pwned: attributed public breach metadata for supplied emails, using your subscription key. No passwords or raw leaks.
-- theHarvester: passive P0 domain discovery through your local HarvestView API, with selected sources, bounded runs and partial results.
-- Maigret: selected-site username checks through an authenticated local companion. Download Maigret-Bridge.zip and install its separate pinned dependency.
+Maigret is now included in the Windows executable. In Search connection, click Set up and enable Maigret. Vidocq starts its authenticated local companion, chooses a port and creates its key automatically. No Python install, separate download, terminal commands or manual key entry.
 
-All three feed case reports with coverage gaps and unverified leads. Session configuration and per-case permission are required. Existing cases keep them off. Matching handles and breach records do not establish identity or account ownership.
+The service stops when disabled or when Vidocq closes. Repeated setup reuses a healthy service; enabled lookups can recover from an exited child. Setup does not query accounts. Session enablement and per-case permissions remain explicit. Advanced users can still configure their own companion.
 
-Setup: docs/ADDITIONAL_COLLECTORS.md. 164 automated tests cover connector contracts and existing functionality. External services require separate installation. Functional tests do not measure investigation accuracy.
+The selected-site and unverified-candidate limits are unchanged. Actual checks need internet access and may be blocked by platforms. Maigret 0.6.6 and its license/database are bundled. See docs/ADDITIONAL_COLLECTORS.md.
