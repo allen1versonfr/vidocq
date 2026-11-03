@@ -25,9 +25,9 @@ There is no built-in notebook cloud sync or analytics. The default data director
 | --- | --- |
 | Domain research | Internet Archive and crt.sh receive the submitted domain. |
 | IP research | The reviewed registry endpoint receives the submitted public IP. |
-| Name / case research | Wikipedia receives the name; GDELT receives an exact-phrase name query against its recent news index. No original article is fetched. |
-| Instagram / TikTok / VSCO | Supplied handles and canonical references stay in the local case/report. With Brave enabled, platform-scoped handle queries go to Brave only. Prepared browser links go to the chosen search engine when clicked. No profile, post, image or video is fetched and no account availability or ownership is tested. |
-| Optional general web search | When enabled with your key, Brave receives exact-phrase name, username, email or phone queries and scoped Instagram/TikTok/VSCO handle queries, including case inputs. Only API snippets are retrieved; no original page or thumbnail is fetched. |
+| Name / case research | The enabled web index receives the supplied name. Unrelated Wikipedia/news fallback queries are no longer used for personal-name research. No original result page is fetched. |
+| Instagram / TikTok / VSCO | Supplied handles and canonical references stay in the local case/report. With web search enabled, platform-scoped handle queries go to the selected index only. Prepared browser links go to the chosen search engine when clicked. No profile, post, image or video is fetched and no account availability or ownership is tested. |
+| Optional general web search | When enabled, free anonymous Mwmbl or optional Brave receives exact-phrase name, username, email or phone queries and scoped Instagram/TikTok/VSCO handle queries, including case inputs. Only API snippets are retrieved; no original page or thumbnail is fetched. |
 | Public source health check | Wikipedia receives Ada Lovelace and ARIN receives 8.8.8.8; no case details are sent. |
 | Phone analysis | Offline metadata only; no calls, texts or owner/account checks. Prepared search URLs include the number, but are not automatically opened. |
 | Topic research | Wikipedia receives the search term. |
@@ -54,10 +54,14 @@ JSON imports preserve original files and records locally. No SpiderFoot server, 
 
 ## Automatic investigations and optional direct connectors (2.9.0)
 
-Confirmed automatic runs can send discovered identifiers to the existing index providers within selected limits; name/employer/location context can be combined in Brave queries. The complete notes/documents are not sent. Opt-in Steam requests go to Valve, optionally CBL; its key stays in Vidocq memory and is excluded from stored/exported source references. The Osintgram bridge sends only the selected Instagram handle and fixed bounded commands to a user-configured loopback port. Osintgram's backend handles its credentials, billing and platform access, which can involve HikerAPI or Instagram. No remote media is loaded by Vidocq.
+Confirmed automatic runs can send discovered identifiers to the existing index providers within selected limits; name/employer/location context can be combined in selected web-index queries. The complete notes/documents are not sent. Opt-in Steam requests go to Valve, optionally CBL; its key stays in Vidocq memory and is excluded from stored/exported source references. The Osintgram bridge sends only the selected Instagram handle and fixed bounded commands to a user-configured loopback port. Osintgram's backend handles its credentials, billing and platform access, which can involve HikerAPI or Instagram. No remote media is loaded by Vidocq.
 
 These connectors require both session enablement and per-case permission. They go beyond third-party-index-only collection. Logs, charges, access restrictions and platform visibility are provider-dependent. Case snapshots retain discovered clues, citations and non-secret connector settings; local SQLite remains unencrypted. See [the setup and privacy details](AUTOMATIC_INVESTIGATIONS.md).
 
 ## Included Maigret service
 
 The setup button starts bundled Maigret locally without installing software, downloading a runtime or querying accounts. Vidocq chooses a loopback port and keeps its generated key in memory. The service stops on disable/app exit. Each case still needs permission before selected public platforms receive a supplied handle. Advanced manual-service settings remain available.
+
+## Free web search
+
+Mwmbl anonymous mode uses the fixed api.mwmbl.org/api/v2/search/ endpoint without a key, account or billing authorization. Queries and connection information go to that provider. Repeated results are cached in memory for 15 minutes; requests are spaced at least 1.1 seconds apart and capped at 100 per app session. HTTP 429 stops queries during a cooldown. Provider monthly/IP quotas also apply. No paid provider is contacted as an automatic fallback. Brave credentials, if separately configured, are never forwarded to Mwmbl.

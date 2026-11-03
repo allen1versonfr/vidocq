@@ -1,3 +1,7 @@
+# 2.12.0
+
+Added free anonymous Mwmbl web search with optional Brave, provider-specific coverage, caching/throttling/cooldowns and no automatic paid fallback. Removed noisy Wikipedia/news fallback from personal-name research. See docs/FREE_WEB_SEARCH.md.
+
 # 2.11.0
 
 Bundle Maigret and its site database; add one-click authenticated companion setup, automatic port/token selection, restart after child exit and lifecycle cleanup. Keep advanced manual-service configuration.

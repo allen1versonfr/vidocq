@@ -174,6 +174,14 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
             raise AssertionError('Disabled bundled companion still running')
         except urllib.error.URLError:pass
         print('Actual bundled Maigret automatic setup, repeat setup, authentication and shutdown passed without account queries.')
+        with request('/api/search-connection',{'provider':'mwmbl','enabled':True}) as response:free_status=json.load(response)
+        assert free_status['configured'] and not free_status['requires_key'] and not free_status['key_configured']
+        with request('/api/research',{'kind':'person','value':'Ada Lovelace'}) as response:free_result=json.load(response)
+        assert len(free_result['results'])==1 and free_result['results'][0]['provider']=='Mwmbl free web index'
+        assert free_result['results'][0]['status']=='ok' and free_result['results'][0]['rows'],free_result
+        assert all('api.mwmbl.org' in row['source'] for row in free_result['results'])
+        with request('/api/search-connection',{'provider':'mwmbl','enabled':False}) as response:assert not json.load(response)['enabled']
+        print('Frozen free anonymous web search returned live canary results without a paid key or account.')
         with request('/api/workspace/backup',{'password':'synthetic backup password'}) as response:bundle=json.load(response)
         assert bundle['encrypted']
         with request('/api/workspace/restore',dict(bundle,password='synthetic backup password')) as response:preview=json.load(response)

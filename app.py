@@ -214,7 +214,7 @@ def news_mentions(value):
     return url,rows
 
 
-ADAPTERS={'domain':[('Internet Archive index',archive),('Certificate Transparency index',certificates)],'ip':[('Regional Internet Registry',network_registry)],'topic':[('Wikipedia index',encyclopedia),('Open Library catalog',books)],'person':[('Wikipedia name index',encyclopedia),('GDELT news index (last 3 months)',news_mentions)],'phone':[('Offline phone metadata',phone_records)]}
+ADAPTERS={'domain':[('Internet Archive index',archive),('Certificate Transparency index',certificates)],'ip':[('Regional Internet Registry',network_registry)],'topic':[('Wikipedia index',encyclopedia),('Open Library catalog',books)],'person':[],'phone':[('Offline phone metadata',phone_records)]}
 
 
 def run_adapter(name,fn,value):
@@ -233,9 +233,9 @@ def run_adapter(name,fn,value):
 def research(kind,value):
     kind,value=normalize(kind,value)
     adapters=list(ADAPTERS.get(kind,[]))
-    if kind in PLATFORMS:adapters.append((PLATFORMS[kind]['name']+' web index (Brave)',lambda handle:WEB_SEARCH.search(handle,site=PLATFORMS[kind]['host'])))
-    if kind=='steam':adapters.append(('Steam web index (Brave)',lambda profile:WEB_SEARCH.search(profile,site='steamcommunity.com')))
-    if kind in ('person','username','email','phone'):adapters.append(('Brave web index',WEB_SEARCH.search))
+    if kind in PLATFORMS:adapters.append((PLATFORMS[kind]['name']+' / '+WEB_SEARCH.label(),lambda handle:WEB_SEARCH.search(handle,site=PLATFORMS[kind]['host'])))
+    if kind=='steam':adapters.append(('Steam / '+WEB_SEARCH.label(),lambda profile:WEB_SEARCH.search(profile,site='steamcommunity.com')))
+    if kind in ('person','username','email','phone'):adapters.append((WEB_SEARCH.label(),WEB_SEARCH.search))
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         results=list(pool.map(lambda pair:run_adapter(pair[0],pair[1],value),adapters))
     flat=[dict(row,origin='offline-metadata' if r['provider']=='Offline phone metadata' else 'retrieved') for r in results for row in r['rows']]
@@ -260,7 +260,7 @@ def db():
 
 from case_reports import CaseService,report_html,report_markdown
 def context_research(terms):
-    return {'results':[run_adapter('Brave context index',lambda values:WEB_SEARCH.search_terms(values),terms)],'links':[]}
+    return {'results':[run_adapter(WEB_SEARCH.label()+' context',lambda values:WEB_SEARCH.search_terms(values),terms)],'links':[]}
 CASES = CaseService(db,normalize,research,news_mentions,CONNECTORS,context_research,COLLECTORS)
 from investigation import InvestigationService, compare_reports
 INVESTIGATION = InvestigationService(db)

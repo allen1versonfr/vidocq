@@ -24,11 +24,15 @@
 
 Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-The current Windows release is **2.11.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+The current Windows release is **2.12.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+
+## Free web search and browser review
+
+In Search connection, click **Enable free web search** to use anonymous Mwmbl without an account, key or payment. Its smaller index and quotas limit coverage. Brave remains optional. Prepared searches can also open in your default Chrome, Firefox or other browser for manual review. [Free search guide](docs/FREE_WEB_SEARCH.md).
 
 ## Automatic investigations with Steam and Osintgram
 
-Enter known identifiers and context, set search/depth limits, and generate a report with an evidence-linked summary, discovered clues, relevance groups and coverage gaps. Optional Steam API and local Osintgram 2.x connectors can enrich supplied or eligible discovered profiles when explicitly allowed. Broad web coverage needs your Brave connection; Steam needs your key, and Osintgram requires its separate configured local service. [Setup and investigation guide →](docs/AUTOMATIC_INVESTIGATIONS.md)
+Enter known identifiers and context, set search/depth limits, and generate a report with an evidence-linked summary, discovered clues, relevance groups and coverage gaps. Optional Steam API and local Osintgram 2.x connectors can enrich supplied or eligible discovered profiles when explicitly allowed. Free Mwmbl web search needs no account or key; optional Brave remains available. Steam needs your key, and Osintgram requires its separate configured local service. [Setup and investigation guide →](docs/AUTOMATIC_INVESTIGATIONS.md)
 
 ## Additional collectors
 

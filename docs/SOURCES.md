@@ -38,3 +38,7 @@ Review the generated counts, reasons, metadata and license; refresh the coverage
 ## Optional connectors in 2.9.0
 
 Automatic investigations add separately configured Steam/CBL API adapters and a local Osintgram 2.x bridge. These are explicit, per-case opt-in integrations, not execution of arbitrary catalog entries. Destinations, transmitted data, credentials, limits, failures and platform-contact behavior are documented in [Automatic investigations](AUTOMATIC_INVESTIGATIONS.md).
+
+## Free web search in 2.12.0
+
+Mwmbl anonymous v2 search is an integrated free web index requiring no account or key. It has a smaller index and provider quotas. Brave remains optional. Case reports include buttons for manually opening prepared searches in the default browser. See [free search and browser review](FREE_WEB_SEARCH.md). These are separate from the bundled framework directory.
