@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from version import VERSION
 from social_profiles import PLATFORMS,detect_platform,normalize_profile,profile_reference
 from web_search import CLIENT as WEB_SEARCH,SearchNotConfigured,outcome
+from research_connectors import CLIENT as CONNECTORS, normalize_steam, is_steam_id
 from updater import UpdateManager
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -63,6 +64,7 @@ def normalize(kind, value):
     value=value.strip()
     if any(ord(c)<32 for c in value):
         raise ValueError('Control characters are not allowed.')
+    if kind=='steam' or (kind=='auto' and (is_steam_id(value) or re.match(r'^(?:https?://)?(?:www\.)?steamcommunity\.com/',value))):return 'steam',normalize_steam(value)
     if kind in PLATFORMS:return kind,normalize_profile(kind,value)
     if kind=='auto' and detect_platform(value):return normalize(detect_platform(value),value)
     if kind=='phone':
@@ -107,6 +109,8 @@ def link(title, url, note):
 
 
 def prepared_links(kind,value):
+    if kind=='steam':
+        return [link('Steam indexed mentions · '+title,base+'?'+urlencode({'q':'site:steamcommunity.com "'+value+'"'}),'Index search only; use the opt-in Steam API connector for profile/library data.') for title,base in [('Google','https://www.google.com/search'),('Bing','https://www.bing.com/search'),('DuckDuckGo','https://duckduckgo.com/')]]
     if kind in PLATFORMS:
         host=PLATFORMS[kind]['host'];query='site:'+host+' "'+value+'"'
         return [link(PLATFORMS[kind]['name']+' indexed mentions · '+title,base+'?'+urlencode({'q':query}),'Search-engine index only. The profile is not visited; relevance and ownership are unverified.') for title,base in [('Google','https://www.google.com/search'),('Bing','https://www.bing.com/search'),('DuckDuckGo','https://duckduckgo.com/')]]
@@ -229,6 +233,7 @@ def research(kind,value):
     kind,value=normalize(kind,value)
     adapters=list(ADAPTERS.get(kind,[]))
     if kind in PLATFORMS:adapters.append((PLATFORMS[kind]['name']+' web index (Brave)',lambda handle:WEB_SEARCH.search(handle,site=PLATFORMS[kind]['host'])))
+    if kind=='steam':adapters.append(('Steam web index (Brave)',lambda profile:WEB_SEARCH.search(profile,site='steamcommunity.com')))
     if kind in ('person','username','email','phone'):adapters.append(('Brave web index',WEB_SEARCH.search))
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         results=list(pool.map(lambda pair:run_adapter(pair[0],pair[1],value),adapters))
@@ -253,7 +258,9 @@ def db():
 
 
 from case_reports import CaseService,report_html,report_markdown
-CASES = CaseService(db,normalize,research,news_mentions)
+def context_research(terms):
+    return {'results':[run_adapter('Brave context index',lambda values:WEB_SEARCH.search_terms(values),terms)],'links':[]}
+CASES = CaseService(db,normalize,research,news_mentions,CONNECTORS,context_research)
 from investigation import InvestigationService, compare_reports
 INVESTIGATION = InvestigationService(db)
 
@@ -291,6 +298,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path=='/':return self.send(200,(ROOT/'ui/index.html').read_bytes(),'text/html; charset=utf-8',cookie=True)
         if not self.authorized():return self.send(403,{'error':'Open the local app window first.'})
         route=urlparse(self.path).path
+        if route=='/assisted.js':return self.send(200,(ROOT/'ui/assisted.js').read_bytes(),'application/javascript; charset=utf-8')
+        if route=='/api/connectors':return self.send(200,CONNECTORS.status())
         if route=='/spiderfoot.js':return self.send(200,(ROOT/'ui/spiderfoot.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/investigation.js':return self.send(200,(ROOT/'ui/investigation.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/api/investigation':return self.send(200,INVESTIGATION.items())
@@ -338,6 +347,14 @@ class Handler(BaseHTTPRequestHandler):
             if size<1 or size>limit:raise ValueError('Invalid request size.')
             p=json.loads(self.rfile.read(size))
             if not isinstance(p,dict):raise ValueError('Invalid request.')
+            if self.path=='/api/connectors':return self.send(200,CONNECTORS.configure(p))
+            if self.path=='/api/connectors/lookup':
+                if p.get('consent') is not True:raise ValueError('Confirm sending this identifier to the selected connector.')
+                if p.get('kind')=='steam':return self.send(200,CONNECTORS.steam(p.get('value',''),p.get('app_id')))
+                if p.get('kind')=='instagram':return self.send(200,CONNECTORS.osintgram(p.get('value',''),'standalone',p.get('commands',['get_user_info'])))
+                raise ValueError('Choose Steam or Instagram for connector lookup.')
+            cancel_run=re.fullmatch(r'/api/case-runs/([0-9a-f]{24})/cancel',self.path)
+            if cancel_run:return self.send(200,CASES.cancel(cancel_run[1]))
             if self.path=='/api/import/spiderfoot':
                 from spiderfoot_import import import_spiderfoot
                 return self.send(200,import_spiderfoot(INVESTIGATION,p))

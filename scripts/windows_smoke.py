@@ -87,6 +87,38 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
         assert all(n==0 for n in sf_repeat['new_records'].values())
         with request('/spiderfoot.js') as response:assert response.status==200
         print('Frozen SpiderFoot preview/import/re-import and frontend asset passed.')
+        # Exercise the assisted engine against a synthetic Osintgram-compatible local service.
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        import threading
+        class OsintgramFixture(BaseHTTPRequestHandler):
+            def log_message(self,*args):pass
+            def reply(self,data):
+                raw=json.dumps(data).encode();self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(raw)));self.end_headers();self.wfile.write(raw)
+            def do_GET(self):self.reply({'repository':'https://github.com/Datalux/Osintgram'})
+            def do_POST(self):
+                p=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                assert self.path=='/api/run' and p['target']=='example' and p['max_items']==5
+                assert p['calls']==[{'name':'get_user_info','args':{}}]
+                self.reply({'target':'example','backend':'synthetic fixture','api_calls_total':1,'tool_calls':[{'name':'get_user_info','result':{'username':'example','full_name':'Example Person','biography':'Contact sample@example.com or +12025550123','is_private':False}}]})
+        fixture=ThreadingHTTPServer(('127.0.0.1',0),OsintgramFixture);threading.Thread(target=fixture.serve_forever,daemon=True).start()
+        try:
+            with request('/api/connectors',{'steam_enabled':False,'osintgram_enabled':True,'osintgram_port':fixture.server_port}) as response:assert json.load(response)['osintgram']['enabled']
+            with request('/api/cases',{'title':'Assisted frozen investigation','phones':['+12025550123'],'instagram':['example'],'steam':['example'],'investigation':{'enabled':True,'direct_sources':True,'max_searches':6,'max_followups':1}}) as response:assisted_case=json.load(response)
+            with request('/api/cases/'+assisted_case['id']+'/run',{'consent':True}) as response:assisted_run=json.load(response)
+            deadline=time.monotonic()+30
+            while True:
+                with request('/api/case-runs/'+assisted_run['id']) as response:assisted_report=json.load(response)
+                if assisted_report['status']=='complete':break
+                assert assisted_report['status'] in ('queued','running') and time.monotonic()<deadline,assisted_report
+                time.sleep(.1)
+            assert assisted_report['analysis']['stronger_leads'] and assisted_report['discovered_clues']
+            assert assisted_report['summary']['followups_scheduled']==1
+            assert any(c['provider']=='Steam connector' and c['status']=='not-configured' for c in assisted_report['coverage'])
+            with request('/api/case-runs/'+assisted_run['id']+'?format=html') as response:assert 'Investigation summary' in response.read().decode()
+            with request('/api/connectors',{'steam_enabled':False,'osintgram_enabled':False}) as response:assert not json.load(response)['osintgram']['enabled']
+            with request('/assisted.js') as response:assert response.status==200
+            print('Frozen assisted investigation, Osintgram bridge, derived-clue budget, Steam configuration gaps and cited summary passed.')
+        finally:fixture.shutdown();fixture.server_close()
         with request('/api/workspace/backup',{'password':'synthetic backup password'}) as response:bundle=json.load(response)
         assert bundle['encrypted']
         with request('/api/workspace/restore',dict(bundle,password='synthetic backup password')) as response:preview=json.load(response)

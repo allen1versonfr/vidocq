@@ -14,9 +14,11 @@ from version import VERSION
 from phone_lookup import inspect_phone
 from web_search import outcome
 from social_profiles import PLATFORMS,normalize_profile,profile_reference
+from assisted_investigation import options as investigation_options, execute as execute_investigation, report_analysis_html, report_analysis_markdown
+from research_connectors import normalize_steam
 
-FIELDS=('names','usernames','emails','phones','domains','ips','instagram','tiktok','vsco','urls')
-LIMITS={'names':3,'usernames':5,'emails':5,'phones':5,'domains':5,'ips':5,'urls':10,'instagram':5,'tiktok':5,'vsco':5}
+FIELDS=('names','usernames','emails','phones','domains','ips','instagram','tiktok','vsco','steam','urls')
+LIMITS={'names':3,'usernames':5,'emails':5,'phones':5,'domains':5,'ips':5,'urls':10,'instagram':5,'tiktok':5,'vsco':5,'steam':5}
 CAUTION='Records are search results or supplied evidence, not verified identity matches. Shared names, reassigned phone numbers, stale records, and unrelated people can produce false matches. This report covers the listed inputs and supported sources, not everything on the internet.'
 
 def process_alive(pid):
@@ -56,6 +58,11 @@ def clean_case(payload,normalize):
     if not isinstance(notes,str) or len(notes)>20000:raise ValueError('Case notes must be 20,000 characters or fewer.')
     region=str(payload.get('phone_region','US')).strip().upper()
     result={'title':title.strip(),'notes':notes,'phone_region':region}
+    result['investigation']=investigation_options(payload.get('investigation'))
+    for field in ('employer','location'):
+        value=payload.get(field,'')
+        if not isinstance(value,str) or len(value)>120 or any(ord(c)<32 for c in value):raise ValueError('Invalid '+field+' context.')
+        result[field]=value.strip()
     total=0
     for field in FIELDS:
         values=payload.get(field,[])
@@ -66,6 +73,7 @@ def clean_case(payload,normalize):
             if not isinstance(value,str) or not value.strip() or len(value)>2000 or any(ord(c)<32 for c in value):raise ValueError(f'Invalid {field} entry.')
             value=value.strip()
             if field in PLATFORMS:value=normalize_profile(field,value)
+            elif field=='steam':value=normalize_steam(value)
             elif field=='phones':value=inspect_phone(value,region)['e164']
             elif field=='urls':
                 if not safe_reference(value):raise ValueError('Reference URLs must be http(s) addresses without credentials.')
@@ -85,9 +93,11 @@ def clean_case(payload,normalize):
     return result
 
 class CaseService:
-    def __init__(self,database,normalize,research,news):
+    def __init__(self,database,normalize,research,news,connectors=None,context_search=None):
         self.database,self.normalize,self.research,self.news=database,normalize,research,news
         self.lock=threading.RLock();self.active=None
+        self.cancel_flags={};self.connectors=connectors
+        self.context_search=context_search or (lambda terms:{'results':[{'provider':'Context web search','status':'not-configured','message':'Context index search is not connected.','rows':[]}],'links':[]})
     def initialize(self):
         with self.database() as db:
             db.execute('CREATE TABLE IF NOT EXISTS cases (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL)')
@@ -107,6 +117,8 @@ class CaseService:
         if not row:raise ValueError('Case not found.')
         data=json.loads(row[0])
         for field in FIELDS:data.setdefault(field,[])
+        data.setdefault('investigation',investigation_options(None))
+        data.setdefault('employer','');data.setdefault('location','')
         return data
     def update(self,key,payload):
         previous=self.get(key)
@@ -127,6 +139,13 @@ class CaseService:
         return json.loads(row[0])
     def _save_run(self,data):
         with self.database() as db:db.execute('UPDATE case_runs SET data=? WHERE id=?',(json.dumps(data),data['id']))
+    def cancel(self,key):
+        self.run(key)
+        with self.lock:
+            flag=self.cancel_flags.get(key)
+            if flag:flag.set()
+        if self.connectors:self.connectors.cancel(key)
+        return {'cancel_requested':bool(flag),'message':'Cancellation requested. Current requests may finish; completed evidence will be retained.' if flag else 'This report is no longer running.'}
     def start(self,key,consent=False):
         if consent is not True:raise ValueError('Confirm sending the listed identifiers to public-index providers before running the report.')
         with self.lock:
@@ -147,12 +166,25 @@ class CaseService:
                 'version':VERSION,'owner_pid':os.getpid(),'created_at':now(),'status':'queued','completed':0,'total':0,'message':'Preparing report…','records':[],
                 'social_profiles':[{'platform':platform,'handle':handle,'reference':profile_reference(platform,handle),'status':'User supplied; not visited or verified'} for platform in PLATFORMS for handle in case.get(platform,[])],
                 'coverage':[],'prepared_searches':[],'phone_metadata':[],'limitations':[CAUTION,'Social profile, phone, email and username ownership is not verified. No calls, messages, account checks, direct profile visits or live target scans are performed.','Reference URLs and notes are context only. Original URLs are never fetched. Search links are prepared but not automatically run.']}
+            opts=investigation_options(case.get('investigation'))
+            if opts['enabled']:
+                if self.connectors:
+                    snapshot=self.connectors.status()
+                    if isinstance(snapshot,dict):run['connector_configuration']=snapshot
+                run['limitations']=[CAUTION,'Automatic follow-ups are bounded leads, not identity proof. Only selected connector data and reviewed indexes are requested; no arbitrary source pages are fetched.',
+                                    'Steam/Osintgram are used only when configured and allowed for this case. Providers may log requests or charge; search budgets count identifier searches, not a guaranteed API bill.',
+                                    'Notes/reference URLs may supply explicit identifiers. Their contents are not automatically fetched. Context queries send supplied name/employer/location terms to the connected search index.']
+                for p in run['social_profiles']:p['status']='Supplied reference. Index/connector activity is documented in source coverage.'
             with self.database() as db:db.execute('INSERT INTO case_runs VALUES (?,?,?)',(run['id'],key,json.dumps(run)))
             self.active=run['id']
+            self.cancel_flags[run['id']]=threading.Event()
             threading.Thread(target=self._execute,args=(run,),daemon=True).start()
             return self.run(run['id'])
     def _execute(self,run):
         try:
+            if run['case'].get('investigation',{}).get('enabled'):
+                execute_investigation(self,run)
+                return
             case=run['case'];tasks=[]
             for field in FIELDS:
                 if field=='urls':continue
@@ -174,6 +206,7 @@ class CaseService:
                 record('User-selected notebook finding',finding.get('source',''),finding.get('title','Finding'),detail,
                        'Notebook '+finding['id'],'user-supplied')
             for field,value in tasks:
+                if self.cancel_flags[run['id']].is_set():break
                 seed=field+': '+value
                 run['message']='Processing '+field+' ('+str(run['completed']+1)+'/'+str(run['total'])+')';self._save_run(run)
                 try:
@@ -183,7 +216,7 @@ class CaseService:
                         report=self.research('phone',value)
                         report['results']=[x for x in report.get('results',[]) if x['provider']!='Offline phone metadata']
                         run['coverage'].append({'seed':seed,'provider':'Offline phone metadata','status':'ok','count':1,'message':'No live phone or owner lookup was performed.'})
-                    elif field in PLATFORMS:report=self.research(field,value)
+                    elif field in PLATFORMS or field=='steam':report=self.research(field,value)
                     elif field=='names':report=self.research('person',value)
                     else:report=self.research({'usernames':'username','emails':'email','domains':'domain','ips':'ip'}[field],value)
                     run['prepared_searches'].extend(dict(link,seed=seed,executed=False) for link in report.get('links',[]))
@@ -198,6 +231,7 @@ class CaseService:
                 run['completed']+=1;run['records']=list(records.values());self._save_run(run)
             result_code,result_message=outcome(run['coverage'],run['records'])
             run.update(status='complete',finished_at=now(),search_outcome=result_code,message=result_message)
+            if self.cancel_flags[run['id']].is_set():run.update(status='cancelled',message='Cancelled; partial evidence retained.')
             run['summary']={'inputs':len(tasks),'records':len(records),'retrieved_records':sum(x['origin']=='retrieved' for x in records.values()),
                 'supplied_records':sum(x['origin']=='user-supplied' for x in records.values()),'offline_records':sum(x['origin']=='offline-metadata' for x in records.values()),
                 'source_errors':sum(x['status']=='error' for x in run['coverage']),'prepared_not_run':len(run['prepared_searches'])}
@@ -205,7 +239,8 @@ class CaseService:
         except Exception:
             run.update(status='failed',message='The report stopped unexpectedly. Completed records were preserved. Start a new run to retry.');self._save_run(run)
         finally:
-            with self.lock:self.active=None
+            with self.lock:
+                self.active=None;self.cancel_flags.pop(run['id'],None)
 
 
 def report_markdown(run):
@@ -215,6 +250,7 @@ def report_markdown(run):
         'App version: '+run['version'],'Status: '+run['status'],block(run.get('message','')),'', '## Scope and uncertainty','',CAUTION,'', '## Summary','',block(json.dumps(run.get('summary',{}),indent=2)),
         '## Supplied context','',block(json.dumps(run['case'],ensure_ascii=False,indent=2)),'## Supplied social profiles','',block(json.dumps(run.get('social_profiles',[]),ensure_ascii=False,indent=2)),'## Source coverage','']
     for item in run['coverage']:lines.extend([block(json.dumps(item,ensure_ascii=False)), ''])
+    if run.get('analysis'):lines.extend([report_analysis_markdown(run),''])
     lines.extend(['## Evidence and citations',''])
     for item in run['records']:
         lines.extend(['### '+item['id'],block(item['title']),block(item['detail']),block('Provider: '+item['provider']+'\nSource request: '+item['source']+'\nReference: '+item['reference']+'\nInputs: '+', '.join(item['matched_inputs'])+'\nOrigin: '+item['origin']+'\nRetrieved: '+item['retrieved_at']+'\nIdentity status: '+item['identity_status'])])
@@ -235,4 +271,4 @@ def report_html(run):
     social='<h2>Supplied social profiles</h2>'+(''.join('<p>'+e(p['platform'])+' · @'+e(p['handle'])+'<br>'+e(p['reference'])+'<br>'+e(p['status'])+'</p>' for p in run.get('social_profiles',[])) or '<p>No platform profiles supplied.</p>')
     context='<dl>'+''.join('<dt>'+e(field.replace('_',' ').title())+'</dt><dd>'+e('\n'.join(value) if isinstance(value,list) else value)+'</dd>' for field,value in run['case'].items() if field not in ('id','notebook_ids','created_at') and value)+'</dl>'
     context+='<h2>Analyst relationships and timeline (supplied assertions)</h2><pre>'+e(json.dumps(run.get('investigation_items',[]),ensure_ascii=False,indent=2))+'</pre>'
-    return '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'"><title>'+title+' · Vidocq report</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:1000px;margin:40px auto;padding:24px;color:#172638}h1,h2,h3{line-height:1.2}h2{margin-top:36px;border-bottom:1px solid #ccd5df;padding-bottom:12px}p,dd,code,pre{white-space:pre-wrap;overflow-wrap:anywhere}article{padding:20px;border:1px solid #ccd5df;margin:16px 0;break-inside:avoid}dt{font-weight:bold}dd{margin:0 0 8px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccd5df;padding:8px;text-align:left;overflow-wrap:anywhere}aside{padding:20px;background:#fff3d8}@media print{body{margin:0;max-width:none;padding:8px;font-size:11px}h2{break-after:avoid}}</style><header><p>VIDOCQ · CASE REPORT · '+e(run['version'])+'</p><h1>'+title+'</h1><p>'+e(run.get('finished_at',run['created_at']))+' · '+e(run['status'])+'</p><p>'+e(run.get('message',''))+'</p></header><aside>'+e(CAUTION)+'</aside><h2>Summary</h2><p>'+e(summary_text)+'</p><h2>Supplied context</h2>'+context+social+'<h2>Source coverage</h2><table><thead><tr><th>Input</th><th>Provider</th><th>Status</th><th>Records</th><th>Notes</th></tr></thead><tbody>'+coverage+'</tbody></table><h2>Evidence and citations</h2>'+ (evidence or '<p>No records were returned. See the source coverage for empty results, failures and unsupported searches.</p>')+'<h2>Prepared searches — not run</h2><ul>'+searches+'</ul><h2>Limitations</h2><ul>'+''.join('<li>'+e(x)+'</li>' for x in run['limitations'])+'</ul><p>This export contains the supplied case details. Store and share it deliberately. Use your browser’s Print command to save a PDF.</p></html>'
+    return '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'"><title>'+title+' · Vidocq report</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:1000px;margin:40px auto;padding:24px;color:#172638}h1,h2,h3{line-height:1.2}h2{margin-top:36px;border-bottom:1px solid #ccd5df;padding-bottom:12px}p,dd,code,pre{white-space:pre-wrap;overflow-wrap:anywhere}article{padding:20px;border:1px solid #ccd5df;margin:16px 0;break-inside:avoid}dt{font-weight:bold}dd{margin:0 0 8px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccd5df;padding:8px;text-align:left;overflow-wrap:anywhere}aside{padding:20px;background:#fff3d8}@media print{body{margin:0;max-width:none;padding:8px;font-size:11px}h2{break-after:avoid}}</style><header><p>VIDOCQ · CASE REPORT · '+e(run['version'])+'</p><h1>'+title+'</h1><p>'+e(run.get('finished_at',run['created_at']))+' · '+e(run['status'])+'</p><p>'+e(run.get('message',''))+'</p></header><aside>'+e(CAUTION)+'</aside><h2>Summary</h2><p>'+e(summary_text)+'</p>'+report_analysis_html(run)+'<h2>Supplied context</h2>'+context+social+'<h2>Source coverage</h2><table><thead><tr><th>Input</th><th>Provider</th><th>Status</th><th>Records</th><th>Notes</th></tr></thead><tbody>'+coverage+'</tbody></table><h2>Evidence and citations</h2>'+ (evidence or '<p>No records were returned. See the source coverage for empty results, failures and unsupported searches.</p>')+'<h2>Prepared searches — not run</h2><ul>'+searches+'</ul><h2>Limitations</h2><ul>'+''.join('<li>'+e(x)+'</li>' for x in run['limitations'])+'</ul><p>This export contains the supplied case details. Store and share it deliberately. Use your browser’s Print command to save a PDF.</p></html>'
