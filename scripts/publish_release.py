@@ -13,10 +13,13 @@ from version import VERSION
 def gh(*args):
     return subprocess.check_output(['gh',*args],text=True)
 
+from scripts.package_maigret_bridge import package
+bridge=package()
+bridge_digest=hashlib.sha256(bridge.read_bytes()).hexdigest()
 tag='v'+VERSION
 exe=Path('dist/Vidocq.exe')
 data=exe.read_bytes();digest=hashlib.sha256(data).hexdigest()
-Path('dist/SHA256SUMS.txt').write_text(digest+'  Vidocq.exe\n',encoding='utf-8')
+Path('dist/SHA256SUMS.txt').write_text(digest+'  Vidocq.exe\n'+bridge_digest+'  Maigret-Bridge.zip\n',encoding='utf-8')
 Path('dist/BUILD_INFO.json').write_text(json.dumps({'name':'Vidocq','version':VERSION,'platform':'Windows 10/11 x64','windows_runtime_tested':True,'automated_tests':unittest.defaultTestLoader.discover('tests').countTestCases(),'frozen_smoke_test':True,'live_public_index_canaries':True,'embedded_icon_verified':True,'social_profile_api_test':True,'phone_case_report_api_test':True,'replacement_restart_test':True,'failed_start_rollback_test':True,'size_bytes':len(data),'sha256':digest},indent=2),encoding='utf-8')
 shutil.copyfile('build/assets/vidocq.ico','dist/Vidocq.ico')
 notes=Path('RELEASE_NOTES.md')
@@ -25,14 +28,15 @@ if existing.returncode==0:
     assert json.loads(existing.stdout)['isDraft'], 'Refusing to overwrite a published version; bump version.py.'
 else:
     gh('release','create',tag,'--draft','--target','main','--title','Vidocq '+VERSION,'--notes-file',str(notes))
-gh('release','upload',tag,str(exe),'dist/SHA256SUMS.txt','dist/BUILD_INFO.json','dist/Vidocq.ico','--clobber')
+gh('release','upload',tag,str(exe),str(bridge),'dist/SHA256SUMS.txt','dist/BUILD_INFO.json','dist/Vidocq.ico','--clobber')
 for attempt in range(12):
     releases=json.loads(gh('api','repos/{owner}/{repo}/releases?per_page=100'))
     matching=[r for r in releases if r['tag_name']==tag]
     assert len(matching)==1, 'Cannot resolve release draft.'
     assets=matching[0]['assets']
     matched=[a for a in assets if a['name']=='Vidocq.exe']
-    if len(matched)==1 and matched[0].get('digest')=='sha256:'+digest and matched[0]['size']==len(data):break
+    bridge_assets=[a for a in assets if a['name']=='Maigret-Bridge.zip']
+    if len(bridge_assets)==1 and bridge_assets[0].get('digest')=='sha256:'+bridge_digest and len(matched)==1 and matched[0].get('digest')=='sha256:'+digest and matched[0]['size']==len(data):break
     time.sleep(5)
 else:
     raise RuntimeError('GitHub asset digest did not match. Release remains a draft.')

@@ -18,6 +18,7 @@ from version import VERSION
 from social_profiles import PLATFORMS,detect_platform,normalize_profile,profile_reference
 from web_search import CLIENT as WEB_SEARCH,SearchNotConfigured,outcome
 from research_connectors import CLIENT as CONNECTORS, normalize_steam, is_steam_id
+from additional_collectors import CLIENT as COLLECTORS
 from updater import UpdateManager
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -260,7 +261,7 @@ def db():
 from case_reports import CaseService,report_html,report_markdown
 def context_research(terms):
     return {'results':[run_adapter('Brave context index',lambda values:WEB_SEARCH.search_terms(values),terms)],'links':[]}
-CASES = CaseService(db,normalize,research,news_mentions,CONNECTORS,context_research)
+CASES = CaseService(db,normalize,research,news_mentions,CONNECTORS,context_research,COLLECTORS)
 from investigation import InvestigationService, compare_reports
 INVESTIGATION = InvestigationService(db)
 
@@ -298,6 +299,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path=='/':return self.send(200,(ROOT/'ui/index.html').read_bytes(),'text/html; charset=utf-8',cookie=True)
         if not self.authorized():return self.send(403,{'error':'Open the local app window first.'})
         route=urlparse(self.path).path
+        if route=='/collectors.js':return self.send(200,(ROOT/'ui/collectors.js').read_bytes(),'application/javascript; charset=utf-8')
+        if route=='/api/collectors':return self.send(200,COLLECTORS.status())
         if route=='/assisted.js':return self.send(200,(ROOT/'ui/assisted.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/api/connectors':return self.send(200,CONNECTORS.status())
         if route=='/spiderfoot.js':return self.send(200,(ROOT/'ui/spiderfoot.js').read_bytes(),'application/javascript; charset=utf-8')
@@ -347,6 +350,13 @@ class Handler(BaseHTTPRequestHandler):
             if size<1 or size>limit:raise ValueError('Invalid request size.')
             p=json.loads(self.rfile.read(size))
             if not isinstance(p,dict):raise ValueError('Invalid request.')
+            if self.path=='/api/collectors':return self.send(200,COLLECTORS.configure(p))
+            if self.path=='/api/collectors/lookup':
+                if p.get('consent') is not True:raise ValueError('Confirm the selected collector activity.')
+                if p.get('kind')=='hibp':return self.send(200,COLLECTORS.hibp(p.get('value','')))
+                if p.get('kind')=='harvester':return self.send(200,COLLECTORS.harvester(p.get('value',''),'standalone',p.get('sources',['crtsh','certspotter'])))
+                if p.get('kind')=='maigret':return self.send(200,COLLECTORS.maigret(p.get('value',''),'standalone',p.get('sites',['GitHub','Reddit','Steam'])))
+                raise ValueError('Choose a supported collector.')
             if self.path=='/api/connectors':return self.send(200,CONNECTORS.configure(p))
             if self.path=='/api/connectors/lookup':
                 if p.get('consent') is not True:raise ValueError('Confirm sending this identifier to the selected connector.')

@@ -93,10 +93,11 @@ def clean_case(payload,normalize):
     return result
 
 class CaseService:
-    def __init__(self,database,normalize,research,news,connectors=None,context_search=None):
+    def __init__(self,database,normalize,research,news,connectors=None,context_search=None,collectors=None):
         self.database,self.normalize,self.research,self.news=database,normalize,research,news
         self.lock=threading.RLock();self.active=None
         self.cancel_flags={};self.connectors=connectors
+        self.collectors=collectors
         self.context_search=context_search or (lambda terms:{'results':[{'provider':'Context web search','status':'not-configured','message':'Context index search is not connected.','rows':[]}],'links':[]})
     def initialize(self):
         with self.database() as db:
@@ -145,6 +146,7 @@ class CaseService:
             flag=self.cancel_flags.get(key)
             if flag:flag.set()
         if self.connectors:self.connectors.cancel(key)
+        if self.collectors:self.collectors.cancel(key)
         return {'cancel_requested':bool(flag),'message':'Cancellation requested. Current requests may finish; completed evidence will be retained.' if flag else 'This report is no longer running.'}
     def start(self,key,consent=False):
         if consent is not True:raise ValueError('Confirm sending the listed identifiers to public-index providers before running the report.')
@@ -168,6 +170,9 @@ class CaseService:
                 'coverage':[],'prepared_searches':[],'phone_metadata':[],'limitations':[CAUTION,'Social profile, phone, email and username ownership is not verified. No calls, messages, account checks, direct profile visits or live target scans are performed.','Reference URLs and notes are context only. Original URLs are never fetched. Search links are prepared but not automatically run.']}
             opts=investigation_options(case.get('investigation'))
             if opts['enabled']:
+                if self.collectors:
+                    snapshot=self.collectors.status()
+                    if isinstance(snapshot,dict):run['collector_configuration']=snapshot
                 if self.connectors:
                     snapshot=self.connectors.status()
                     if isinstance(snapshot,dict):run['connector_configuration']=snapshot
@@ -258,6 +263,8 @@ def report_markdown(run):
     for item in run['prepared_searches']:lines.append(block(item['seed']+'\n'+item['title']+'\n'+item['url']))
     lines.extend(['## Limitations','',block('\n'.join(run['limitations']))])
     lines.extend(['## Analyst relationships and timeline (supplied assertions)','',block(json.dumps(run.get('investigation_items',[]),ensure_ascii=False,indent=2))])
+    if any(c.get('provider')=='Have I Been Pwned' for c in run.get('coverage',[])):
+        lines.extend(['## Data attribution','','Breach data: [Have I Been Pwned](https://haveibeenpwned.com/), licensed under CC BY 4.0.'])
     return '\n'.join(lines)
 
 
@@ -271,4 +278,6 @@ def report_html(run):
     social='<h2>Supplied social profiles</h2>'+(''.join('<p>'+e(p['platform'])+' · @'+e(p['handle'])+'<br>'+e(p['reference'])+'<br>'+e(p['status'])+'</p>' for p in run.get('social_profiles',[])) or '<p>No platform profiles supplied.</p>')
     context='<dl>'+''.join('<dt>'+e(field.replace('_',' ').title())+'</dt><dd>'+e('\n'.join(value) if isinstance(value,list) else value)+'</dd>' for field,value in run['case'].items() if field not in ('id','notebook_ids','created_at') and value)+'</dl>'
     context+='<h2>Analyst relationships and timeline (supplied assertions)</h2><pre>'+e(json.dumps(run.get('investigation_items',[]),ensure_ascii=False,indent=2))+'</pre>'
+    if any(c.get('provider')=='Have I Been Pwned' for c in run.get('coverage',[])):
+        context+='<p>Breach data: <a href="https://haveibeenpwned.com/" rel="noreferrer">Have I Been Pwned</a>, licensed under CC BY 4.0.</p>'
     return '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'"><title>'+title+' · Vidocq report</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:1000px;margin:40px auto;padding:24px;color:#172638}h1,h2,h3{line-height:1.2}h2{margin-top:36px;border-bottom:1px solid #ccd5df;padding-bottom:12px}p,dd,code,pre{white-space:pre-wrap;overflow-wrap:anywhere}article{padding:20px;border:1px solid #ccd5df;margin:16px 0;break-inside:avoid}dt{font-weight:bold}dd{margin:0 0 8px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccd5df;padding:8px;text-align:left;overflow-wrap:anywhere}aside{padding:20px;background:#fff3d8}@media print{body{margin:0;max-width:none;padding:8px;font-size:11px}h2{break-after:avoid}}</style><header><p>VIDOCQ · CASE REPORT · '+e(run['version'])+'</p><h1>'+title+'</h1><p>'+e(run.get('finished_at',run['created_at']))+' · '+e(run['status'])+'</p><p>'+e(run.get('message',''))+'</p></header><aside>'+e(CAUTION)+'</aside><h2>Summary</h2><p>'+e(summary_text)+'</p>'+report_analysis_html(run)+'<h2>Supplied context</h2>'+context+social+'<h2>Source coverage</h2><table><thead><tr><th>Input</th><th>Provider</th><th>Status</th><th>Records</th><th>Notes</th></tr></thead><tbody>'+coverage+'</tbody></table><h2>Evidence and citations</h2>'+ (evidence or '<p>No records were returned. See the source coverage for empty results, failures and unsupported searches.</p>')+'<h2>Prepared searches — not run</h2><ul>'+searches+'</ul><h2>Limitations</h2><ul>'+''.join('<li>'+e(x)+'</li>' for x in run['limitations'])+'</ul><p>This export contains the supplied case details. Store and share it deliberately. Use your browser’s Print command to save a PDF.</p></html>'

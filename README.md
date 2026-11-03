@@ -24,11 +24,15 @@
 
 Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-The current Windows release is **2.9.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+The current Windows release is **2.10.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
 
 ## Automatic investigations with Steam and Osintgram
 
 Enter known identifiers and context, set search/depth limits, and generate a report with an evidence-linked summary, discovered clues, relevance groups and coverage gaps. Optional Steam API and local Osintgram 2.x connectors can enrich supplied or eligible discovered profiles when explicitly allowed. Broad web coverage needs your Brave connection; Steam needs your key, and Osintgram requires its separate configured local service. [Setup and investigation guide →](docs/AUTOMATIC_INVESTIGATIONS.md)
+
+## Additional collectors
+
+Optional HIBP email breach metadata, passive theHarvester domain research and selected-site Maigret username checks now feed case reports. Each requires setup and a case permission. HIBP needs your subscription key; theHarvester and Maigret need separate local services. [Setup and limits](docs/ADDITIONAL_COLLECTORS.md).
 
 ## SpiderFoot import
 

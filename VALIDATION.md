@@ -1,3 +1,11 @@
+# Validation for Vidocq 2.10.0
+
+164 automated tests pass, including 17 new collector tests for opt-ins, destinations, response contracts, attribution, cooldowns, cancellation, partial coverage and companion authentication. Maigret 0.6.6 was separately installed to inspect its interface and database. New upstream results use synthetic contracts; live authenticated HarvestView and real-account Maigret investigations were not evaluated.
+
+The official HIBP reserved integration-test account returned the expected public breach fixture using its test key. No personal email was queried. All five frontend scripts pass syntax checks. The local Windows executable passed prior smoke checks plus the new collector asset, defaults and missing-connection coverage. A visual browser check was blocked by the browser approval gate and was not completed.
+
+Previous validation:
+
 # Validation for Vidocq 2.9.0
 
 147 automated tests pass locally, including 25 assisted-investigation/connector tests alongside all 122 prior tests. New coverage includes legacy notebook loading, immutable captured evidence, editable assessments/history, relationship/evidence validation, event date ranges, explicit merge/split assignments, text and PDF/screenshot extraction, unavailable-OCR preservation, attachment hashing/deduplication, encrypted round trips, restore preview/idempotence, conflict atomicity, invalid schema/hash/reference rejection, active-run backup rejection, and report comparison with multiple records per source.

@@ -1,14 +1,9 @@
-# Vidocq 2.9.0 — Give it your clues, get a sourced report
+# Vidocq 2.10.0 - Additional investigation sources
 
-Cases & reports now supports bounded automatic investigation: enter names, phones, accounts and other identifiers, then let connected sources retrieve records, identify eligible new clues and follow them within your chosen limits.
+- Have I Been Pwned: attributed public breach metadata for supplied emails, using your subscription key. No passwords or raw leaks.
+- theHarvester: passive P0 domain discovery through your local HarvestView API, with selected sources, bounded runs and partial results.
+- Maigret: selected-site username checks through an authenticated local companion. Download Maigret-Bridge.zip and install its separate pinned dependency.
 
-Reports include an executive summary, stronger leads with multiple supplied identifiers, uncertain/unlinked results, explicit profile-name differences, source failures, unanswered questions and a cited follow-up trail. Cancel a run and export its preserved partial results.
+All three feed case reports with coverage gaps and unverified leads. Session configuration and per-case permission are required. Existing cases keep them off. Matching handles and breach records do not establish identity or account ownership.
 
-New optional connections:
-
-- Steam: native public API profile/vanity resolution, disclosed game library/recent playtime, optional game AppID filter and attributed Community Ban List records. Requires your Steam Web API key.
-- Osintgram: bridge to your separately installed/configured Datalux/Osintgram 2.x service for public-profile information, account-about data and up to five recent posts' captions/hashtags. Its backend credentials and any charges remain in Osintgram.
-
-Connections must be enabled for the session and explicitly allowed in the case. Default direct connectors are off. Broad name/phone/handle coverage usually requires your Brave API key. The readiness notice makes missing connections clear before a run. Results remain leads; the app does not infer account ownership from a matching name or guarantee a complete profile.
-
-Existing cases/reports remain compatible. Source boundaries and setup are documented in docs/AUTOMATIC_INVESTIGATIONS.md. Tests use synthetic data; live authenticated Steam/CBL/HikerAPI/Instagram calls were not tested without user credentials.
+Setup: docs/ADDITIONAL_COLLECTORS.md. 164 automated tests cover connector contracts and existing functionality. External services require separate installation. Functional tests do not measure investigation accuracy.
