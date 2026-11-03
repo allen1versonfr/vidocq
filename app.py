@@ -15,6 +15,7 @@ import time
 import webbrowser
 from datetime import datetime, timezone
 from version import VERSION
+from web_search import CLIENT as WEB_SEARCH,SearchNotConfigured,outcome
 from updater import UpdateManager
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -30,7 +31,7 @@ UPDATES = UpdateManager(DATA)
 NETWORK_HOSTS = frozenset({'archive.org', 'crt.sh', 'en.wikipedia.org', 'rdap.arin.net', 'rdap.db.ripe.net', 'rdap.apnic.net', 'rdap.lacnic.net', 'rdap.afrinic.net', 'openlibrary.org', 'api.gdeltproject.org'})
 LINK_HOSTS = NETWORK_HOSTS | {'www.google.com', 'www.bing.com', 'lookup.icann.org', 'stat.ripe.net', 'duckduckgo.com', 'scholar.google.com', 'pubmed.ncbi.nlm.nih.gov', 'patents.google.com'}
 COOKIE = secrets.token_urlsafe(32)
-HEADERS = {'User-Agent': 'Vidocq/2.5.0 (public-index research; local desktop app)', 'Accept': 'application/json'}
+HEADERS = {'User-Agent': 'Vidocq/'+VERSION+' (+https://github.com/allen1versonfr/vidocq; public-index research)', 'Accept': 'application/json'}
 
 
 def check_provider_url(url, hosts=NETWORK_HOSTS):
@@ -69,7 +70,7 @@ def normalize(kind, value):
             ipaddress.ip_address(value)
             kind='ip'
         except ValueError:
-            kind='phone' if re.fullmatch(r'[+()0-9 .-]+',value) and sum(c.isdigit() for c in value)>=7 else 'email' if '@' in value and ' ' not in value else ('domain' if '.' in value and ' ' not in value else 'username')
+            kind='person' if ' ' in value and any(c.isalpha() for c in value) and not value.startswith(('https://','http://')) else 'phone' if re.fullmatch(r'[+()0-9 .-]+',value) and sum(c.isdigit() for c in value)>=7 else 'email' if '@' in value and ' ' not in value else ('domain' if '.' in value and ' ' not in value else 'username')
     if kind=='phone':
         from phone_lookup import inspect_phone
         return 'phone',inspect_phone(value)['e164']
@@ -149,6 +150,7 @@ def certificates(value):
 def encyclopedia(value):
     url='https://en.wikipedia.org/w/rest.php/v1/search/page?'+urlencode({'q':value,'limit':8})
     data=get_json(url)
+    if not isinstance(data,dict) or not isinstance(data.get('pages'),list):raise ValueError('Wikipedia returned an unexpected response; the search did not complete.')
     return url,[{'title':p.get('title','Untitled'),'detail':html.unescape(re.sub('<[^>]+>','',p.get('description') or p.get('excerpt') or 'No description.'))} for p in data.get('pages',[])]
 
 
@@ -167,6 +169,7 @@ def books(value):
 def network_registry(value):
     url='https://rdap.arin.net/registry/ip/'+quote(value,safe=':')
     d=get_json(url)
+    if not isinstance(d,dict) or 'errorCode' in d or not (d.get('startAddress') and d.get('endAddress')):raise ValueError('Registry returned an error or unexpected response; lookup did not complete.')
     rows=[{'title':d.get('name') or d.get('handle') or 'Network allocation','detail':f"Range: {d.get('startAddress','?')} – {d.get('endAddress','?')} · Country: {d.get('country','not listed')} · Registry status: {', '.join(d.get('status',[])) or 'not listed'}"}]
     return url,rows
 
@@ -209,7 +212,8 @@ def run_adapter(name,fn,value):
         url,rows=fn(value)
         return {'provider':name,'status':'ok' if rows else 'empty','rows':rows,'source':url,'elapsed':round(time.monotonic()-started,1)}
     except Exception as error:
-        message='Provider unavailable or request timed out.'
+        if isinstance(error,SearchNotConfigured):return {'provider':name,'status':'not-configured','rows':[],'message':str(error),'elapsed':round(time.monotonic()-started,1)}
+        message='Provider unavailable or request timed out. This is not a no-match result.'
         if isinstance(error,HTTPError):message=f'Provider returned HTTP {error.code}. It may be rate-limited or require access.'
         elif isinstance(error,ValueError):message=str(error)
         return {'provider':name,'status':'error','rows':[],'message':message,'elapsed':round(time.monotonic()-started,1)}
@@ -217,10 +221,13 @@ def run_adapter(name,fn,value):
 
 def research(kind,value):
     kind,value=normalize(kind,value)
-    adapters=ADAPTERS.get(kind,[])
+    adapters=list(ADAPTERS.get(kind,[]))
+    if kind in ('person','username','email','phone'):adapters.append(('Brave web index',WEB_SEARCH.search))
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         results=list(pool.map(lambda pair:run_adapter(pair[0],pair[1],value),adapters))
-    return {'kind':kind,'query':value,'searched_at':datetime.now(timezone.utc).isoformat(),'results':results,'links':prepared_links(kind,value),'mode':'Third-party indexes only','notice':'No target-owned website, profile, DNS server, or IP is queried directly. Providers may log requests. There is no guarantee of anonymity or absence of notification.'}
+    flat=[dict(row,origin='offline-metadata' if r['provider']=='Offline phone metadata' else 'retrieved') for r in results for row in r['rows']]
+    status,message=outcome(results,flat)
+    return {'search_outcome':status,'search_message':message,'web_search':WEB_SEARCH.status(),'kind':kind,'query':value,'searched_at':datetime.now(timezone.utc).isoformat(),'results':results,'links':prepared_links(kind,value),'mode':'Third-party indexes only','notice':'No target-owned website, profile, DNS server, or IP is queried directly. Providers may log requests. There is no guarantee of anonymity or absence of notification.'}
 
 
 class NotebookConnection(sqlite3.Connection):
@@ -275,6 +282,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path=='/':return self.send(200,(ROOT/'ui/index.html').read_bytes(),'text/html; charset=utf-8',cookie=True)
         if not self.authorized():return self.send(403,{'error':'Open the local app window first.'})
         route=urlparse(self.path).path
+        if route=='/api/search-connection':return self.send(200,WEB_SEARCH.status())
         if route=='/api/cases':return self.send(200,CASES.list())
         match=re.fullmatch(r'/api/cases/([0-9a-f]{24})',route)
         runs=re.fullmatch(r'/api/cases/([0-9a-f]{24})/runs',route)
@@ -309,6 +317,11 @@ class Handler(BaseHTTPRequestHandler):
             if size<1 or size>(7_100_000 if self.path=='/api/image-search' else 200_000):raise ValueError('Invalid request size.')
             p=json.loads(self.rfile.read(size))
             if not isinstance(p,dict):raise ValueError('Invalid request.')
+            if self.path=='/api/source-health':
+                probes=[('Wikipedia (public canary)',encyclopedia,'Ada Lovelace'),('Registry (public canary)',network_registry,'8.8.8.8')]
+                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(lambda x:run_adapter(*x),probes))
+                return self.send(200,{'probes':results,'web_search':WEB_SEARCH.status(),'notice':'Public canary queries only; no case identifiers were sent.'})
+            if self.path=='/api/search-connection':return self.send(200,WEB_SEARCH.configure(p))
             if self.path=='/api/phone':
                 from phone_lookup import inspect_phone
                 return self.send(200,inspect_phone(p.get('value',''),p.get('region','US')))
