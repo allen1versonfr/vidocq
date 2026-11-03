@@ -78,6 +78,18 @@ class CaseTests(unittest.TestCase):
         self.assertFalse(any('reference.example' in str(x) for x in self.calls))
         self.assertTrue(all(x['identity_status']=='Unverified relevance' for x in run['records']))
         self.assertEqual(run['summary']['retrieved_records'],1) # Same index record merged without claiming identity.
+    def test_phone_index_results_are_not_discarded(self):
+        self.service.research=lambda kind,value: {'results':[{'provider':'Brave web index','status':'ok','source':'https://api.search.brave.com/res/v1/web/search','rows':[{'title':'Indexed mention','detail':'Unverified','reference':'https://example.org/mention'}]}],'links':[]}
+        run=self.finish(self.make(names=[],phones=['2025550123']))
+        self.assertEqual(run['summary']['retrieved_records'],1)
+        self.assertEqual(run['summary']['offline_records'],1)
+        self.assertEqual(run['search_outcome'],'records-found')
+    def test_unconnected_report_and_exports_explain_no_search(self):
+        self.service.research=lambda kind,value: {'results':[{'provider':'Brave web index','status':'not-configured','rows':[],'message':'Connect search'}],'links':[]}
+        run=self.finish(self.make(names=[],phones=['2025550123']))
+        self.assertEqual(run['search_outcome'],'not-searched')
+        self.assertIn('No online result search completed',report_html(run))
+        self.assertIn('No online result search completed',report_markdown(run))
     def test_report_snapshot_does_not_change_after_case_edit(self):
         case=self.make();run=self.finish(case)
         self.service.update(case['id'],{'title':'Different','names':['Another Person']})
