@@ -1,0 +1,38 @@
+# Data and privacy
+
+[← Project overview](../README.md)
+
+## Local data
+
+| Item | Handling |
+| --- | --- |
+| Saved findings | Stored in `%LOCALAPPDATA%\Vidocq\workspace.sqlite3`; unencrypted SQLite. |
+| Text queries | Not automatically saved as findings. Saving a returned record includes query context in the finding. |
+| JSON exports | Written where your browser or native download dialog saves them; contain saved findings and source references. |
+| Image files and SauceNAO keys | Not intentionally persisted by the app. Image-search source references can be saved as notebook findings. |
+| GitHub token entered in Updates | Kept in process memory for the session; not written into the notebook or update jobs. |
+| `VIDOCQ_GITHUB_TOKEN` | Optional OS environment variable managed by you; persistent storage, if configured, is outside the app. |
+| Diagnostics | `startup.log` and `update-result.json` in the data folder. Review before sharing. |
+| Update files | Temporary downloads/helper files, plus a `.previous` executable beside the app for recovery. |
+
+There is no built-in notebook cloud sync or analytics. The default data directory can be overridden with `VIDOCQ_DATA`; older `ALL_SEEING_EYES_DATA` and `OSINT_DESK_DATA` variables are supported for compatibility. When no current notebook exists, the app can copy an earlier AllSeeingEyes or OSINTDesk notebook without deleting the original.
+
+## Network activity
+
+| Action | Who receives data |
+| --- | --- |
+| Domain research | Internet Archive and crt.sh receive the submitted domain. |
+| IP research | The reviewed registry endpoint receives the submitted public IP. |
+| Topic research | Wikipedia receives the search term. |
+| Prepared browser search | The chosen search/index provider receives the query when you open it. |
+| Image search | SauceNAO receives a metadata-stripped image and API key after upload consent. |
+| Update check | GitHub receives an update request at app launch or when you check manually. A token is included if supplied. |
+| Update download | GitHub and its allowed asset hosts serve the executable. |
+
+Providers also see ordinary connection information, such as your IP address, and may log requests. Passive research is not a promise of anonymity or zero notification. Opening original pages from an external browser can contact those sites.
+
+The app does not directly visit submitted social profiles, scan submitted IPs/domains, query their DNS servers, attempt logins or account recovery, or test account existence. No remote result thumbnails, third-party scripts, or external fonts are loaded by the app UI. This repository’s README uses external badge images when viewed on GitHub; those are separate from the application.
+
+## Protecting your workspace
+
+Use device encryption and operating-system access controls if your findings are sensitive. Back up the database while Vidocq is closed. Do not include API keys, GitHub tokens, personal queries, or private notebook records in bug reports. Use only images and information you have permission to process, and assess returned evidence before acting on it.
