@@ -27,10 +27,10 @@ ROOT = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parent))
 DATA = Path(os.environ.get('VIDOCQ_DATA') or os.environ.get('ALL_SEEING_EYES_DATA') or os.environ.get('OSINT_DESK_DATA') or (Path(os.environ.get('LOCALAPPDATA', Path.home()/'.local/share')) / 'Vidocq'))
 EXIT_EVENT = threading.Event()
 UPDATES = UpdateManager(DATA)
-NETWORK_HOSTS = frozenset({'archive.org', 'crt.sh', 'en.wikipedia.org', 'rdap.arin.net', 'rdap.db.ripe.net', 'rdap.apnic.net', 'rdap.lacnic.net', 'rdap.afrinic.net', 'openlibrary.org'})
+NETWORK_HOSTS = frozenset({'archive.org', 'crt.sh', 'en.wikipedia.org', 'rdap.arin.net', 'rdap.db.ripe.net', 'rdap.apnic.net', 'rdap.lacnic.net', 'rdap.afrinic.net', 'openlibrary.org', 'api.gdeltproject.org'})
 LINK_HOSTS = NETWORK_HOSTS | {'www.google.com', 'www.bing.com', 'lookup.icann.org', 'stat.ripe.net', 'duckduckgo.com', 'scholar.google.com', 'pubmed.ncbi.nlm.nih.gov', 'patents.google.com'}
 COOKIE = secrets.token_urlsafe(32)
-HEADERS = {'User-Agent': 'Vidocq/2.4.0 (public-index research; local desktop app)', 'Accept': 'application/json'}
+HEADERS = {'User-Agent': 'Vidocq/2.5.0 (public-index research; local desktop app)', 'Accept': 'application/json'}
 
 
 def check_provider_url(url, hosts=NETWORK_HOSTS):
@@ -61,12 +61,18 @@ def normalize(kind, value):
     value=value.strip()
     if any(ord(c)<32 for c in value):
         raise ValueError('Control characters are not allowed.')
+    if kind=='phone':
+        from phone_lookup import inspect_phone
+        return 'phone',inspect_phone(value)['e164']
     if kind=='auto':
         try:
             ipaddress.ip_address(value)
             kind='ip'
         except ValueError:
-            kind='email' if '@' in value and ' ' not in value else ('domain' if '.' in value and ' ' not in value else 'username')
+            kind='phone' if re.fullmatch(r'[+()0-9 .-]+',value) and sum(c.isdigit() for c in value)>=7 else 'email' if '@' in value and ' ' not in value else ('domain' if '.' in value and ' ' not in value else 'username')
+    if kind=='phone':
+        from phone_lookup import inspect_phone
+        return 'phone',inspect_phone(value)['e164']
     if kind=='domain':
         value=value.removeprefix('https://').removeprefix('http://').rstrip('/')
         try:
@@ -86,7 +92,7 @@ def normalize(kind, value):
     elif kind=='email':
         if not re.fullmatch(r'[^\s@]+@[^\s@]+\.[^\s@]+',value):
             raise ValueError('Enter a valid email address.')
-    elif kind not in ('username','topic'):
+    elif kind not in ('username','topic','person'):
         raise ValueError('Unsupported input type.')
     return kind,value
 
@@ -106,7 +112,7 @@ def prepared_links(kind,value):
         links.extend([link('Certificate Transparency index','https://crt.sh/?'+urlencode({'q':value}),'Existing certificate records, no live domain scan.'),link('ICANN registration lookup','https://lookup.icann.org/en/lookup?'+urlencode({'name':value}),'Third-party registration records; data may be redacted.'),link('Indexed pages','https://www.google.com/search?'+urlencode({'q':'site:'+value}),'Search index only; original pages are not retrieved by this app.')])
     elif kind=='ip':
         links.append(link('RIPE public network records','https://stat.ripe.net/'+quote(value,safe=''),'Registry information; no scan of this address.'))
-    elif kind=='topic':
+    elif kind in ('topic','person'):
         links.append(link('Wikipedia search','https://en.wikipedia.org/w/index.php?'+urlencode({'search':value}),'Public encyclopedia index.'))
     links.append(link('DuckDuckGo indexed mentions','https://duckduckgo.com/?'+urlencode({'q':exact}),'Independent search index; opens only after a click.'))
     if kind=='topic':
@@ -165,7 +171,36 @@ def network_registry(value):
     return url,rows
 
 
-ADAPTERS={'domain':[('Internet Archive index',archive),('Certificate Transparency index',certificates)],'ip':[('Regional Internet Registry',network_registry)],'topic':[('Wikipedia index',encyclopedia),('Open Library catalog',books)]}
+def phone_records(value):
+    from phone_lookup import inspect_phone
+    d=inspect_phone(value)
+    return 'Offline libphonenumber '+d['metadata_version'],[{'title':d['international'],'detail':json.dumps(d,ensure_ascii=False)}]
+
+
+NEWS_LOCK=threading.Lock()
+NEWS_LAST=0.0
+
+def news_mentions(value):
+    global NEWS_LAST
+    query='"'+value.replace('"','').replace('\\','')+'"'
+    url='https://api.gdeltproject.org/api/v2/doc/doc?'+urlencode({'query':query,'mode':'artlist','format':'json','maxrecords':10,'timespan':'3m','sort':'datedesc'})
+    with NEWS_LOCK:
+        delay=5-(time.monotonic()-NEWS_LAST)
+        if delay>0:time.sleep(delay)
+        NEWS_LAST=time.monotonic()
+        data=get_json(url)
+    if not isinstance(data,dict) or not isinstance(data.get('articles'),list):raise ValueError('GDELT did not return an article list.')
+    from case_reports import safe_reference
+    rows=[]
+    for item in data['articles'][:10]:
+        if not isinstance(item,dict):continue
+        rows.append({'title':str(item.get('title') or 'News index entry')[:500],
+            'detail':'Indexed: '+str(item.get('seendate') or 'Unknown')+' · Source: '+str(item.get('domain') or 'Unknown')+' · Identity relevance is unverified.',
+            'reference':safe_reference(item.get('url'))})
+    return url,rows
+
+
+ADAPTERS={'domain':[('Internet Archive index',archive),('Certificate Transparency index',certificates)],'ip':[('Regional Internet Registry',network_registry)],'topic':[('Wikipedia index',encyclopedia),('Open Library catalog',books)],'person':[('Wikipedia name index',encyclopedia),('GDELT news index (last 3 months)',news_mentions)],'phone':[('Offline phone metadata',phone_records)]}
 
 
 def run_adapter(name,fn,value):
@@ -203,6 +238,10 @@ def db():
     return c
 
 
+from case_reports import CaseService,report_html,report_markdown
+CASES = CaseService(db,normalize,research,news_mentions)
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self,*args):pass  # Do not persist queries in server logs.
 
@@ -235,6 +274,21 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get('Host')!=host:return self.send(403,{'error':'Localhost only.'})
         if self.path=='/':return self.send(200,(ROOT/'ui/index.html').read_bytes(),'text/html; charset=utf-8',cookie=True)
         if not self.authorized():return self.send(403,{'error':'Open the local app window first.'})
+        route=urlparse(self.path).path
+        if route=='/api/cases':return self.send(200,CASES.list())
+        match=re.fullmatch(r'/api/cases/([0-9a-f]{24})',route)
+        runs=re.fullmatch(r'/api/cases/([0-9a-f]{24})/runs',route)
+        report=re.fullmatch(r'/api/case-runs/([0-9a-f]{24})',route)
+        try:
+            if match:return self.send(200,CASES.get(match[1]))
+            if runs:return self.send(200,CASES.runs(runs[1]))
+            if report:
+                data=CASES.run(report[1]);fmt=parse_qs(urlparse(self.path).query).get('format',['json'])[0]
+                if fmt=='html':return self.send(200,report_html(data).encode('utf-8'),'text/html; charset=utf-8')
+                if fmt=='markdown':return self.send(200,report_markdown(data).encode('utf-8'),'text/markdown; charset=utf-8')
+                if fmt!='json':return self.send(400,{'error':'Unsupported report format.'})
+                return self.send(200,data)
+        except ValueError as error:return self.send(404,{'error':str(error)})
         if urlparse(self.path).path=='/api/catalog':
             from catalog import query_catalog
             try:return self.send(200,query_catalog({k:v[0] for k,v in parse_qs(urlparse(self.path).query).items()}))
@@ -255,6 +309,14 @@ class Handler(BaseHTTPRequestHandler):
             if size<1 or size>(7_100_000 if self.path=='/api/image-search' else 200_000):raise ValueError('Invalid request size.')
             p=json.loads(self.rfile.read(size))
             if not isinstance(p,dict):raise ValueError('Invalid request.')
+            if self.path=='/api/phone':
+                from phone_lookup import inspect_phone
+                return self.send(200,inspect_phone(p.get('value',''),p.get('region','US')))
+            if self.path=='/api/cases':return self.send(201,CASES.create(p))
+            case_edit=re.fullmatch(r'/api/cases/([0-9a-f]{24})',self.path)
+            if case_edit:return self.send(200,CASES.update(case_edit[1],p))
+            case_run=re.fullmatch(r'/api/cases/([0-9a-f]{24})/run',self.path)
+            if case_run:return self.send(202,CASES.start(case_run[1],p.get('consent')))
             if self.path=='/api/catalog/search':
                 from catalog import indexed_source_url
                 url=indexed_source_url(p.get('id'),p.get('query'))
@@ -329,11 +391,13 @@ def main():
     parser.add_argument('--port',type=int,default=0)
     args=parser.parse_args()
     migrate_legacy_data()
+    CASES.initialize()
     if args.self_test or args.smoke_test:
         import image_search
         from PIL import Image
         with db() as connection:connection.execute('SELECT count(*) FROM findings').fetchone()
-        import updater, webview
+        import updater, webview, phone_lookup, case_reports
+        assert phone_lookup.inspect_phone('+442083661177')['e164']=='+442083661177'
         from catalog import catalog
         assert catalog()['summary']['entries'] == len(catalog()['entries'])
         assert (ROOT/'ui/index.html').is_file() and (ROOT/'ui/app.js').is_file()

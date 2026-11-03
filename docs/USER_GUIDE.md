@@ -46,4 +46,4 @@ Use **Quit** to stop the app. In browser mode, closing the browser tab alone doe
 | Updates say access denied | Follow the [private-repository token instructions](UPDATES.md). |
 | Installation fails | Keep the EXE in a writable folder and see [recovery instructions](UPDATES.md#recovery). |
 
-For unresolved problems, [open a bug report](https://github.com/allen1versonfr/test/issues/new/choose) with reproducible steps and redacted diagnostics.
+For unresolved problems, [open a bug report](https://github.com/allen1versonfr/vidocq/issues/new/choose) with reproducible steps and redacted diagnostics.

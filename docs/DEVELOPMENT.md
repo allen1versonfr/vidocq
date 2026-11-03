@@ -20,6 +20,8 @@ Use `python app.py` for the native window when the necessary GUI runtime is avai
 | --- | --- |
 | `app.py` | Local HTTP API, reviewed text adapters, notebook persistence, data migration, and window lifecycle. |
 | `image_search.py` | SauceNAO requests, image preparation, and response normalization. |
+| `phone_lookup.py` | Offline number parsing and numbering-plan metadata. |
+| `case_reports.py` | Case validation/storage, background report jobs, citations, coverage, and safe exports. |
 | `updater.py` | GitHub release selection, downloads, verification, helper replacement, and rollback. |
 | `version.py` | Current version and update repository. |
 | `launch.py` | Packaged application entry point, startup logging, and updater-helper entry point. |
@@ -40,7 +42,7 @@ node --check ui/app.js
 
 The build script installs the pinned runtime dependencies and PyInstaller, runs the Python suite, builds `dist\Vidocq.exe`, and runs Windows smoke checks. Node.js is needed for the separate frontend syntax command and is present in the GitHub runner.
 
-The 2.4.0 suite contains 53 automated tests. Frozen Windows checks validate bundled imports/UI assets/database access, executable replacement and restart, and recovery after an invalid replacement cannot launch. They do not manually exercise the interactive native window. See [VALIDATION.md](../VALIDATION.md).
+The 2.5.0 suite contains 72 automated tests. Frozen Windows checks validate bundled imports/UI assets/database access, executable replacement and restart, and recovery after an invalid replacement cannot launch. They do not manually exercise the interactive native window. See [VALIDATION.md](../VALIDATION.md).
 
 Use `VIDOCQ_DATA` pointing to a disposable directory for development so tests and manual experiments do not use your everyday notebook.
 

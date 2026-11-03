@@ -88,7 +88,7 @@ def fetch_release(token=''):
         return select_release(release)
     except HTTPError as error:
         if error.code in (401, 404):
-            raise ValueError('Repository is private or access was denied. Enter a GitHub token with Contents: read access to allen1versonfr/test.') from None
+            raise ValueError('Repository is private or access was denied. Enter a GitHub token with Contents: read access to allen1versonfr/vidocq.') from None
         if error.code in (403, 429):
             raise ValueError('GitHub rate limit or permission restriction. Try later or use a read-only token.') from None
         raise ValueError('GitHub could not return the release. Try again later.') from None

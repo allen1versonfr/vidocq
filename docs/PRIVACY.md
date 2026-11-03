@@ -6,6 +6,7 @@
 
 | Item | Handling |
 | --- | --- |
+| Cases and report snapshots | Stored in the existing SQLite workspace, including supplied identifiers, notes, selected evidence and report results; not encrypted. |
 | Saved findings | Stored in `%LOCALAPPDATA%\Vidocq\workspace.sqlite3`; unencrypted SQLite. |
 | Text queries | Not automatically saved as findings. Saving a returned record includes query context in the finding. |
 | JSON exports | Written where your browser or native download dialog saves them; contain saved findings and source references. |
@@ -23,6 +24,8 @@ There is no built-in notebook cloud sync or analytics. The default data director
 | --- | --- |
 | Domain research | Internet Archive and crt.sh receive the submitted domain. |
 | IP research | The reviewed registry endpoint receives the submitted public IP. |
+| Name / case research | Wikipedia receives the name; GDELT receives an exact-phrase name query against its recent news index. No original article is fetched. |
+| Phone analysis | Offline metadata only; no calls, texts or owner/account checks. Prepared search URLs include the number, but are not automatically opened. |
 | Topic research | Wikipedia receives the search term. |
 | Prepared browser search | The chosen search/index provider receives the query when you open it. |
 | Image search | SauceNAO receives a metadata-stripped image and API key after upload consent. |
