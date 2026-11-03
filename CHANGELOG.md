@@ -2,6 +2,15 @@
 
 Changes documented from the releases created for this repository.
 
+## 2.5.0 — 2026-11-03
+
+- Added offline international phone parsing, numbering-plan validation and allocation/type/carrier metadata, with explicit owner/location limitations.
+- Added multi-input cases, selected notebook evidence, background report generation and immutable report snapshots.
+- Added Wikipedia/GDELT name-index coverage, source/error/not-run accounting, citations and exact-record deduplication without identity assertions.
+- Added self-contained printable HTML, Markdown and JSON report exports.
+- Updated the canonical repository reference to `allen1versonfr/vidocq` after the repository rename.
+- Added case persistence, consent, interrupted-run, export escaping and HTTP tests; 72 tests pass locally. The release workflow also exercises the actual frozen phone/case/report/export endpoints before publication.
+
 ## 2.4.0 — 2026-11-03
 
 - Added the full 1,171-entry framework source catalog with free-tier, category, text and integration filters.
@@ -35,4 +44,4 @@ Changes documented from the releases created for this repository.
 
 Published as `vidocq-windows`. Established the Vidocq name and portable Windows package with research, image-search, notebook, and legacy-data migration features. This executable predates the in-app updater and requires one manual replacement to reach 2.3.0.
 
-For full download history, see [Releases](https://github.com/allen1versonfr/test/releases).
+For full download history, see [Releases](https://github.com/allen1versonfr/vidocq/releases).
