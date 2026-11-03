@@ -113,7 +113,7 @@ def prepared_links(kind,value):
     exact='"'+value.replace('"','')+'"'
     links=[link('Google indexed mentions','https://www.google.com/search?'+urlencode({'q':exact}),'Search results only. Opening an original result can contact that website.'),link('Bing indexed mentions','https://www.bing.com/search?'+urlencode({'q':exact}),'Search this independent index; the provider receives the query.')]
     if kind=='username':
-        for site,name in [('github.com','GitHub'),('reddit.com','Reddit'),('instagram.com','Instagram'),('tiktok.com','TikTok')]:
+        for site,name in [('github.com','GitHub'),('reddit.com','Reddit'),('instagram.com','Instagram'),('tiktok.com','TikTok'),('vsco.co','VSCO')]:
             links.append(link(name+' indexed mentions','https://www.google.com/search?'+urlencode({'q':f'site:{site} {exact}'}),'Search-engine index only; no account existence or login checks.'))
     elif kind=='domain':
         links.extend([link('Certificate Transparency index','https://crt.sh/?'+urlencode({'q':value}),'Existing certificate records, no live domain scan.'),link('ICANN registration lookup','https://lookup.icann.org/en/lookup?'+urlencode({'name':value}),'Third-party registration records; data may be redacted.'),link('Indexed pages','https://www.google.com/search?'+urlencode({'q':'site:'+value}),'Search index only; original pages are not retrieved by this app.')])
