@@ -254,6 +254,8 @@ def db():
 
 from case_reports import CaseService,report_html,report_markdown
 CASES = CaseService(db,normalize,research,news_mentions)
+from investigation import InvestigationService, compare_reports
+INVESTIGATION = InvestigationService(db)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -289,6 +291,16 @@ class Handler(BaseHTTPRequestHandler):
         if self.path=='/':return self.send(200,(ROOT/'ui/index.html').read_bytes(),'text/html; charset=utf-8',cookie=True)
         if not self.authorized():return self.send(403,{'error':'Open the local app window first.'})
         route=urlparse(self.path).path
+        if route=='/investigation.js':return self.send(200,(ROOT/'ui/investigation.js').read_bytes(),'application/javascript; charset=utf-8')
+        if route=='/api/investigation':return self.send(200,INVESTIGATION.items())
+        attachment=re.fullmatch(r'/api/attachments/([0-9a-f]{24})',route)
+        if attachment:
+            try:
+                name,media,digest,content=INVESTIGATION.attachment(attachment[1])
+                if parse_qs(urlparse(self.path).query).get('metadata')==['1']:
+                    return self.send(200,{'name':name,'media_type':media,'sha256':digest})
+                return self.send(200,content,'application/octet-stream')
+            except ValueError as error:return self.send(404,{'error':str(error)})
         if route=='/vidocq-icon.svg':return self.send(200,(ROOT/'ui/vidocq-icon.svg').read_bytes(),'image/svg+xml')
         if route=='/api/search-connection':return self.send(200,WEB_SEARCH.status())
         if route=='/api/cases':return self.send(200,CASES.list())
@@ -311,8 +323,7 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:return self.send(400,{'error':str(e)})
         if self.path=='/api/updates':return self.send(200,UPDATES.status())
         if self.path=='/api/findings':
-            with db() as c:rows=c.execute('SELECT data FROM findings ORDER BY rowid DESC').fetchall()
-            return self.send(200,[json.loads(row[0]) for row in rows])
+            return self.send(200,INVESTIGATION.findings())
         if self.path in ('/app.js','/style.css'):
             mime='application/javascript; charset=utf-8' if self.path.endswith('.js') else 'text/css; charset=utf-8'
             return self.send(200,(ROOT/'ui'/self.path[1:]).read_bytes(),mime)
@@ -322,9 +333,18 @@ class Handler(BaseHTTPRequestHandler):
         if not self.authorized():return self.send(403,{'error':'Invalid local session or origin.'})
         try:
             size=int(self.headers.get('Content-Length','0'))
-            if size<1 or size>(7_100_000 if self.path=='/api/image-search' else 200_000):raise ValueError('Invalid request size.')
+            limit=71_000_000 if self.path in ('/api/workspace/restore','/api/workspace/backup') else 14_100_000 if self.path=='/api/ingest' else 7_100_000 if self.path=='/api/image-search' else 200_000
+            if size<1 or size>limit:raise ValueError('Invalid request size.')
             p=json.loads(self.rfile.read(size))
             if not isinstance(p,dict):raise ValueError('Invalid request.')
+            if self.path=='/api/investigation':return self.send(200,INVESTIGATION.save_item(p))
+            if self.path=='/api/investigation/reorganize':return self.send(200,INVESTIGATION.reorganize(p))
+            if self.path=='/api/ingest':return self.send(200,INVESTIGATION.ingest(p))
+            if self.path=='/api/workspace/backup':return self.send(200,INVESTIGATION.export_bundle(p.get('password','')))
+            if self.path=='/api/workspace/restore':
+                if CASES.active:raise ValueError('Wait for the current report before restoring.')
+                return self.send(200,INVESTIGATION.restore(p))
+            if self.path=='/api/reports/compare':return self.send(200,compare_reports(CASES.run(p.get('before','')),CASES.run(p.get('after',''))))
             if self.path=='/api/source-health':
                 probes=[('Wikipedia (public canary)',encyclopedia,'Ada Lovelace'),('Registry (public canary)',network_registry,'8.8.8.8')]
                 with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(lambda x:run_adapter(*x),probes))
@@ -365,10 +385,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200,search_image(p))
             if self.path=='/api/research':return self.send(200,research(p.get('kind','auto'),p.get('value','')))
             if self.path=='/api/save':
-                if not isinstance(p.get('title'),str) or not p['title'].strip():raise ValueError('A title is required.')
-                item={'id':secrets.token_hex(12),'title':p['title'][:500],'notes':str(p.get('notes',''))[:10000],'source':str(p.get('source',''))[:2000],'status':p.get('status') if p.get('status') in ('Unverified lead','Corroborated','Rejected') else 'Unverified lead','date':datetime.now(timezone.utc).isoformat()}
-                with db() as c:c.execute('INSERT INTO findings VALUES (?,?)',(item['id'],json.dumps(item)))
-                return self.send(200,item)
+                return self.send(200,INVESTIGATION.save_finding(p))
             if self.path=='/api/open':
                 url=check_provider_url(str(p.get('url','')),LINK_HOSTS)
                 # Only pre-reviewed search/index URL patterns, never arbitrary target links.
@@ -413,6 +430,7 @@ def main():
     args=parser.parse_args()
     migrate_legacy_data()
     CASES.initialize()
+    INVESTIGATION.initialize()
     if args.self_test or args.smoke_test:
         import image_search
         from PIL import Image

@@ -133,11 +133,17 @@ class CaseService:
             if self.active:raise ValueError('Another case report is running. Wait for it to finish.')
             case=self.get(key)
             supplied=[]
+            investigation=[]
             with self.database() as db:
                 for finding_id in case['notebook_ids']:
                     row=db.execute('SELECT data FROM findings WHERE id=?',(finding_id,)).fetchone()
                     if row:supplied.append(json.loads(row[0]))
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='investigation_items'").fetchone():
+                    items=[dict(json.loads(raw),kind=kind) for kind,raw in db.execute('SELECT kind,data FROM investigation_items')]
+                    selected=set(case['notebook_ids'])
+                    investigation=[item for item in items if key in item.get('case_ids',[]) or selected.intersection(item.get('evidence_ids',[]))]
             run={'id':secrets.token_hex(12),'case_id':key,'case':copy.deepcopy(case),'supplied_findings':supplied,
+                'investigation_items':investigation,
                 'version':VERSION,'owner_pid':os.getpid(),'created_at':now(),'status':'queued','completed':0,'total':0,'message':'Preparing report…','records':[],
                 'social_profiles':[{'platform':platform,'handle':handle,'reference':profile_reference(platform,handle),'status':'User supplied; not visited or verified'} for platform in PLATFORMS for handle in case.get(platform,[])],
                 'coverage':[],'prepared_searches':[],'phone_metadata':[],'limitations':[CAUTION,'Social profile, phone, email and username ownership is not verified. No calls, messages, account checks, direct profile visits or live target scans are performed.','Reference URLs and notes are context only. Original URLs are never fetched. Search links are prepared but not automatically run.']}
@@ -162,7 +168,10 @@ class CaseService:
                 records[key]={'id':'R'+str(len(records)+1).zfill(3),'provider':provider,'source':source,'reference':safe_reference(reference),
                     'title':title,'detail':detail,'matched_inputs':[seed],'retrieved_at':now(),'origin':origin,'identity_status':'Unverified relevance'}
             for finding in run['supplied_findings']:
-                record('User-selected notebook finding',finding.get('source',''),finding.get('title','Finding'),finding.get('notes',''),
+                capture=finding.get('capture',{})
+                detail=(capture.get('excerpt','')+'\n\nAnalyst assessment: '+finding.get('notes','')) if capture else finding.get('notes','')
+                if capture:detail+='\nPreserved provenance: '+json.dumps(capture,ensure_ascii=False)
+                record('User-selected notebook finding',finding.get('source',''),finding.get('title','Finding'),detail,
                        'Notebook '+finding['id'],'user-supplied')
             for field,value in tasks:
                 seed=field+': '+value
@@ -212,6 +221,7 @@ def report_markdown(run):
     lines.extend(['## Prepared searches — not run',''])
     for item in run['prepared_searches']:lines.append(block(item['seed']+'\n'+item['title']+'\n'+item['url']))
     lines.extend(['## Limitations','',block('\n'.join(run['limitations']))])
+    lines.extend(['## Analyst relationships and timeline (supplied assertions)','',block(json.dumps(run.get('investigation_items',[]),ensure_ascii=False,indent=2))])
     return '\n'.join(lines)
 
 
@@ -224,4 +234,5 @@ def report_html(run):
     summary_text=('Processed '+str(summary.get('inputs',run['completed']))+' identifiers. '+str(summary.get('retrieved_records',0))+' records were retrieved from supported indexes, '+str(summary.get('offline_records',0))+' were offline metadata, and '+str(summary.get('supplied_records',0))+' were supplied notebook findings. '+str(summary.get('source_errors',0))+' source operations failed; '+str(summary.get('prepared_not_run',len(run['prepared_searches'])))+' browser searches were prepared but not run.')
     social='<h2>Supplied social profiles</h2>'+(''.join('<p>'+e(p['platform'])+' · @'+e(p['handle'])+'<br>'+e(p['reference'])+'<br>'+e(p['status'])+'</p>' for p in run.get('social_profiles',[])) or '<p>No platform profiles supplied.</p>')
     context='<dl>'+''.join('<dt>'+e(field.replace('_',' ').title())+'</dt><dd>'+e('\n'.join(value) if isinstance(value,list) else value)+'</dd>' for field,value in run['case'].items() if field not in ('id','notebook_ids','created_at') and value)+'</dl>'
+    context+='<h2>Analyst relationships and timeline (supplied assertions)</h2><pre>'+e(json.dumps(run.get('investigation_items',[]),ensure_ascii=False,indent=2))+'</pre>'
     return '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; base-uri \'none\'; form-action \'none\'"><title>'+title+' · Vidocq report</title><style>body{font:16px/1.6 system-ui,sans-serif;max-width:1000px;margin:40px auto;padding:24px;color:#172638}h1,h2,h3{line-height:1.2}h2{margin-top:36px;border-bottom:1px solid #ccd5df;padding-bottom:12px}p,dd,code,pre{white-space:pre-wrap;overflow-wrap:anywhere}article{padding:20px;border:1px solid #ccd5df;margin:16px 0;break-inside:avoid}dt{font-weight:bold}dd{margin:0 0 8px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccd5df;padding:8px;text-align:left;overflow-wrap:anywhere}aside{padding:20px;background:#fff3d8}@media print{body{margin:0;max-width:none;padding:8px;font-size:11px}h2{break-after:avoid}}</style><header><p>VIDOCQ · CASE REPORT · '+e(run['version'])+'</p><h1>'+title+'</h1><p>'+e(run.get('finished_at',run['created_at']))+' · '+e(run['status'])+'</p><p>'+e(run.get('message',''))+'</p></header><aside>'+e(CAUTION)+'</aside><h2>Summary</h2><p>'+e(summary_text)+'</p><h2>Supplied context</h2>'+context+social+'<h2>Source coverage</h2><table><thead><tr><th>Input</th><th>Provider</th><th>Status</th><th>Records</th><th>Notes</th></tr></thead><tbody>'+coverage+'</tbody></table><h2>Evidence and citations</h2>'+ (evidence or '<p>No records were returned. See the source coverage for empty results, failures and unsupported searches.</p>')+'<h2>Prepared searches — not run</h2><ul>'+searches+'</ul><h2>Limitations</h2><ul>'+''.join('<li>'+e(x)+'</li>' for x in run['limitations'])+'</ul><p>This export contains the supplied case details. Store and share it deliberately. Use your browser’s Print command to save a PDF.</p></html>'

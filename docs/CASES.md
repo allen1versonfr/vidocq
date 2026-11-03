@@ -40,7 +40,7 @@ No original news articles, profiles, reference URLs or remote thumbnails are fet
 
 ## Images and other evidence
 
-For image evidence, use **Image search**, confirm the SauceNAO upload, save relevant results to Notebook, and select those findings in the case. The case form does not automatically upload files or identify people from faces. Preserve observations from other documents in the notes or notebook with their source references; binary document ingestion and automatic OCR are not included in this release.
+For image evidence, use **Image search**, confirm the SauceNAO upload, save relevant results to Notebook, and select those findings in the case. The case form does not automatically upload files or identify people from faces. Preserve observations from other documents in the notes or notebook with their source references; local PDF/text/screenshot ingestion and Windows OCR are available under Investigation; see [the investigation guide](INVESTIGATION.md).
 
 ## Read the report
 
@@ -56,7 +56,7 @@ Select a completed snapshot and export:
 - **Markdown:** readable text with source and evidence sections.
 - **JSON:** the complete structured snapshot for inspection or later processing.
 
-Exports contain the supplied identifiers and selected evidence. Cases, notes and report snapshots are not encrypted by the app. Protect the database and exports accordingly. Exports are not currently importable back into the case UI.
+Exports contain the supplied identifiers and selected evidence. Cases, notes and report snapshots are not encrypted by the app. Protect the database and exports accordingly. Individual report exports are not importable. Use Investigation → Backup for complete, restorable workspace bundles.
 
 ## Search connection and empty reports
 

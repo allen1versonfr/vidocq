@@ -43,3 +43,7 @@ The app does not directly visit submitted social profiles, scan submitted IPs/do
 ## Protecting your workspace
 
 Use device encryption and operating-system access controls if your findings are sensitive. Back up the database while Vidocq is closed. Do not include API keys, GitHub tokens, personal queries, or private notebook records in bug reports. Use only images and information you have permission to process, and assess returned evidence before acting on it.
+
+## Investigation evidence and backups (2.7.0)
+
+Imported documents/screenshots, original bytes and hashes, extracted text, entities, relationships, timeline events and assessment history are stored locally in SQLite without encryption. OCR uses Windows locally; no OCR service receives files. Complete workspace bundles optionally use password encryption. This does not encrypt local SQLite data or report/notebook exports. Bundle passwords are never persisted. See [the investigation guide](INVESTIGATION.md) for limits and restore behavior.
