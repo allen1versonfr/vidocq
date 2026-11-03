@@ -21,6 +21,9 @@ Use `python app.py` for the native window when the necessary GUI runtime is avai
 | `app.py` | Local HTTP API, reviewed text adapters, notebook persistence, data migration, and window lifecycle. |
 | `image_search.py` | SauceNAO requests, image preparation, and response normalization. |
 | `phone_lookup.py` | Offline number parsing and numbering-plan metadata. |
+| `social_profiles.py` | Offline Instagram, TikTok and VSCO input normalization and supplied references; never fetches profiles. |
+| `scripts/build_icon.py` | Generates the original vector app mark and multi-resolution Windows ICO. |
+| `scripts/check_windows_icon.py` | Verifies generated ICO frame bytes inside the actual Windows executable. |
 | `case_reports.py` | Case validation/storage, background report jobs, citations, coverage, and safe exports. |
 | `updater.py` | GitHub release selection, downloads, verification, helper replacement, and rollback. |
 | `version.py` | Current version and update repository. |
@@ -40,9 +43,9 @@ node --check ui/app.js
 .\build_windows.bat
 ```
 
-The build script installs the pinned runtime dependencies and PyInstaller, runs the Python suite, builds `dist\Vidocq.exe`, and runs Windows smoke checks. Node.js is needed for the separate frontend syntax command and is present in the GitHub runner.
+The build script installs the pinned runtime dependencies and PyInstaller, generates the Windows ICO, runs the Python suite, embeds the icon and builds `dist\Vidocq.exe`, and runs Windows smoke checks. Node.js is needed for the separate frontend syntax command and is present in the GitHub runner.
 
-The 2.5.0 suite contains 72 automated tests. Frozen Windows checks validate bundled imports/UI assets/database access, executable replacement and restart, and recovery after an invalid replacement cannot launch. They do not manually exercise the interactive native window. See [VALIDATION.md](../VALIDATION.md).
+The 2.6.0 suite contains 98 automated tests. Frozen Windows checks validate exact embedded icon frames, bundled imports/UI assets/database access, social profile Research/case/report/export APIs, executable replacement and restart, and recovery after an invalid replacement cannot launch. They do not manually exercise the interactive native window. See [VALIDATION.md](../VALIDATION.md).
 
 Use `VIDOCQ_DATA` pointing to a disposable directory for development so tests and manual experiments do not use your everyday notebook.
 
@@ -52,7 +55,7 @@ Use `VIDOCQ_DATA` pointing to a disposable directory for development so tests an
 2. Set a newer stable version in `version.py`, such as `2.4.0`. Keep user-facing version strings consistent with the version change; Windows smoke checks read version.py.
 3. Push the completed change to `main`. A change to `version.py` or `.github/workflows/windows.yml` triggers the release workflow. The workflow can also be run manually from Actions on the intended branch.
 4. Check the run: dependency installation → tests → frontend syntax → Windows build → frozen executable checks → artifact upload → release publication.
-5. Confirm the release assets: `Vidocq.exe`, `SHA256SUMS.txt`, and `BUILD_INFO.json`. Future in-app updates require the exact executable name and a GitHub SHA-256 asset digest.
+5. Confirm the release assets: `Vidocq.exe`, `SHA256SUMS.txt`, `BUILD_INFO.json`, and `Vidocq.ico`. Future in-app updates require the exact executable name and a GitHub SHA-256 asset digest.
 
 Source or documentation changes alone do not automatically publish a new version unless one of the workflow’s trigger paths changes. Do not dispatch concurrent publication attempts. The workflow uses a concurrency group, refuses to overwrite a published version, and can resume a draft after a publishing failure. Bump the version for a replacement to an already published release.
 
