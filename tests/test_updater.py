@@ -12,7 +12,7 @@ import updater as u
 PAYLOAD = b'MZ' + b'new-executable' * 100
 DIGEST = hashlib.sha256(PAYLOAD).hexdigest()
 def release(**overrides):
-    r = {'tag_name':'v2.4.0', 'draft':False, 'prerelease':False, 'body':'Notes', 'assets':[
+    r = {'tag_name':'v9.0.0', 'draft':False, 'prerelease':False, 'body':'Notes', 'assets':[
         {'id':123,'name':'Vidocq.exe','state':'uploaded','size':len(PAYLOAD),'digest':'sha256:'+DIGEST}]}
     r.update(overrides)
     return r
@@ -20,7 +20,7 @@ def release(**overrides):
 class ReleaseTests(unittest.TestCase):
     def test_numeric_versions(self):
         self.assertGreater(u.version_tuple('v2.10.0'),u.version_tuple('2.9.9'))
-        self.assertIsNone(u.select_release(release(tag_name='v2.3.0')))
+        self.assertIsNone(u.select_release(release(tag_name='v'+u.VERSION)))
         self.assertIsNone(u.select_release(release(tag_name='v2.2.1')))
     def test_bad_version_and_unstable(self):
         for tag in ['latest','v2.4.0-beta','v02.4.0','2.4','2.4.0;evil']:
