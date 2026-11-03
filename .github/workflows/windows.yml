@@ -20,6 +20,8 @@ jobs:
           python-version: '3.12'
       - name: Install pinned build dependencies
         run: python -m pip install -r requirements.txt pyinstaller==6.20.0
+      - name: Generate Windows icon assets
+        run: python scripts/build_icon.py
       - name: Test application and update recovery
         run: python -m unittest discover -s tests -v
       - name: Check live public index canaries
@@ -27,7 +29,7 @@ jobs:
       - name: Validate frontend syntax
         run: node --check ui/app.js
       - name: Build portable Windows executable
-        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name Vidocq --add-data "ui;ui" --add-data "source-catalog.json;." --add-data "docs/OSINT_FRAMEWORK_LICENSE.txt;." --collect-all webview --collect-all phonenumbers launch.py
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name Vidocq --icon "build/assets/vidocq.ico" --add-data "build/assets;assets" --add-data "ui;ui" --add-data "source-catalog.json;." --add-data "docs/OSINT_FRAMEWORK_LICENSE.txt;." --collect-all webview --collect-all phonenumbers launch.py
       - name: Test actual Windows executable, replacement, restart and rollback
         run: python scripts/windows_smoke.py
       - uses: actions/upload-artifact@v4
