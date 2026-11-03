@@ -40,7 +40,7 @@ class ManagedMaigret:
                 while time.monotonic()<deadline:
                     if self.process.poll() is not None:break
                     try:
-                        about=transport('http://127.0.0.1:'+str(self.port)+'/api/about',key=self.key,service='maigret',timeout=1)
+                        about=transport('http://127.0.0.1:'+str(self.port)+'/api/about',key=self.key,service='maigret',timeout=10)
                         if about.get('service')=='vidocq-maigret-bridge' and about.get('protocol')==1:
                             self.state='ready';return self.key,self.port
                     except (ValueError,OSError):pass

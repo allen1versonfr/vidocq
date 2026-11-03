@@ -40,11 +40,16 @@ def site_selection(names):
     return chosen,aliases
 
 class Bridge:
-    def __init__(self):self.lock=threading.RLock();self.jobs={};self.cancelled=set()
+    def __init__(self):self.lock=threading.RLock();self.jobs={};self.cancelled=set();self.metadata=None
     def about(self):
-        import maigret
-        _,available=site_selection(list(MAIGRET_SITES))
-        return {'available_sites':list(available.values()),'service':'vidocq-maigret-bridge','protocol':1,'maigret_version':importlib.metadata.version('maigret'),'sites':list(MAIGRET_SITES),'public_checks_only':True}
+        # Serialize and cache database validation so readiness retries cannot
+        # trigger concurrent imports/database loads on a slow first launch.
+        with self.lock:
+            if self.metadata is None:
+                import maigret
+                _,available=site_selection(list(MAIGRET_SITES))
+                self.metadata={'available_sites':list(available.values()),'service':'vidocq-maigret-bridge','protocol':1,'maigret_version':importlib.metadata.version('maigret'),'sites':list(MAIGRET_SITES),'public_checks_only':True}
+            return dict(self.metadata)
     def cancel(self,run_id):
         if not isinstance(run_id,str) or not re.fullmatch('[0-9a-f]{24}',run_id):raise ValueError('Invalid run ID.')
         with self.lock:
