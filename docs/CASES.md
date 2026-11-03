@@ -55,3 +55,9 @@ Select a completed snapshot and export:
 - **JSON:** the complete structured snapshot for inspection or later processing.
 
 Exports contain the supplied identifiers and selected evidence. Cases, notes and report snapshots are not encrypted by the app. Protect the database and exports accordingly. Exports are not currently importable back into the case UI.
+
+## Search connection and empty reports
+
+Version 2.5.1 can retrieve Brave index snippets for names, usernames, emails and phones when you supply and enable your own API key in **Search connection**. Without it, those general web searches are not run. Wikipedia and news cover only some names. Brave may require payment-card signup and charges beyond its limited monthly credits; review the provider plan. Keys are held only in memory (or an environment variable managed by you), never in the case database. Original pages are not fetched.
+
+A completed report means processing finished. Its outcome separately states whether online records were returned, sources failed, no search completed, or the completed indexes had no matches. Offline phone metadata is not an online match. Use **Check public sources** for canaries, then create a new report after fixing a connection; saved snapshots are immutable.

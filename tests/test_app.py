@@ -16,7 +16,7 @@ class PolicyTests(unittest.TestCase):
  def test_username_email_no_enumeration(self):
   with patch.object(app,'get_json') as request:
    for k,v in [('username','sample'),('email','sample@example.com')]:
-    r=app.research(k,v);self.assertEqual(r['results'],[]);self.assertTrue(all(app.allowed_external(x['url']) for x in r['links']))
+    r=app.research(k,v);self.assertEqual(r['results'][0]['status'],'not-configured');self.assertEqual(r['search_outcome'],'not-searched');self.assertTrue(all(app.allowed_external(x['url']) for x in r['links']))
    request.assert_not_called()
  def test_archive_metadata_only(self):
   with patch.object(app,'get_json',return_value={'archived_snapshots':{'closest':{'url':'https://web.archive.org/web/1/https://example.com','timestamp':'20200101','available':True,'status':'200'}}}) as request:

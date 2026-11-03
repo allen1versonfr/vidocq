@@ -1,16 +1,13 @@
-## Vidocq 2.5.0 — Phone analysis and case reports
+## Vidocq 2.5.1 — Search results and diagnostics
 
-- Added Phone analysis for international/national normalization, country calling code, numbering region, number type, allocation region and original carrier metadata. This is offline numbering-plan data, not an owner lookup or live location/carrier check.
-- Added Cases & reports: supply names, usernames, emails, phones, domains, public IPs, reference URLs, notes and explicitly selected notebook evidence together.
-- Added background report runs, progress, persistent cases, editable inputs and immutable report snapshots.
-- Names search Wikipedia and GDELT’s recent news index. Existing domain/IP index adapters are retained. No original article, profile or reference URL is fetched.
-- Reports separate retrieved records, offline metadata, supplied evidence, errors, empty results and searches not automatically run. Records have source citations and unverified identity relevance; exact duplicates are consolidated without claiming identity or independent corroboration.
-- Export printable, self-contained HTML, Markdown and JSON. Open HTML and use Print → Save as PDF.
-- Updated updater/repository references after the rename to allen1versonfr/vidocq.
-- 72 automated tests plus actual Windows frozen app, phone/case/report/export and updater replacement/restart/rollback checks gate publication.
+- Fixed Auto detect treating full names as usernames.
+- Added an optional Brave Search API connection to retrieve actual indexed snippets for names, usernames, emails and phone numbers, including case reports. Original result pages are never fetched.
+- Added clear disconnected, failed, incomplete and no-match outcomes in research, case reports and exports. Offline phone metadata is not counted as an online search.
+- Added Search connection settings and public Wikipedia/RDAP health checks. Keys remain in memory, are sent only to the fixed API endpoint, and are never included in reports. Redirects are blocked. Requests are capped at 100 per app session.
+- Reject malformed encyclopedia/registry/search responses instead of showing false empty results.
+- Added a live public-index canary gate before the Windows build and release.
 
-### Coverage limits
-Email, username and phone web searches remain prepared browser links, not automatic owner/account searches. Phone metadata does not identify a person or live location. A report covers the listed supported searches and supplied context, not everything on the internet. Common names, number reassignment and stale indexes can cause false matches. No calls, SMS, account checks, live target scans, facial identification or unconsented image uploads are added.
+### Set up general web search
+Open **Search connection**, enter your own Brave Search API key, enable it, then rerun research or generate a new report. Brave requires signup and a payment card. Its current $5 monthly credits are limited; check provider pricing and usage. This optional integration is not unlimited free search. No account or key is included. Without it, Wikipedia/news/registry adapters still work where applicable; email/username/phone web searches remain prepared links.
 
-### Use it
-Update from the Updates tab, then open Cases & reports. Choose a phone region for national numbers, enter one identifier per line, save the case, confirm the listed index requests and generate a report. For image findings, use Image search, save relevant results to Notebook and select those findings in the case. Cases/reports and exported identifiers are not encrypted by the app.
+83 automated tests, frontend syntax, live public canaries and actual Windows executable/report/updater checks gate publication. Brave response/error/security tests use mocked responses; no live Brave request was tested because no user API key was supplied. Matching index mentions do not verify identity or phone ownership. Source outages and incomplete indexing remain possible.

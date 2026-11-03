@@ -24,7 +24,7 @@
 
 Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-The current Windows release is **2.5.0**. Its 72 automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+The current Windows release is **2.5.1**. Its 83 automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
 
 ## What you can do
 
@@ -32,7 +32,7 @@ The current Windows release is **2.5.0**. Its 72 automated tests and Windows exe
 | --- | --- |
 | **Cases & reports** | Combine supplied identifiers and selected notebook evidence into persistent, cited report snapshots; export printable HTML, Markdown or JSON. |
 | **Phone** | Normalize numbers and inspect offline numbering-plan metadata without calling, messaging or identifying an owner. |
-| **Research** | Look up domains, public IPs, and topics through reviewed third-party indexes. Prepare username and email search queries. |
+| **Research** | Look up domains, public IPs, and topics through reviewed third-party indexes. Retrieve indexed mentions with an optional Brave API connection. |
 | **Image search** | Search SauceNAO for possible image-source matches, with similarity scores and source references. |
 | **Notebook** | Save returned records or your own observations, add context and an evidence status, and export findings as JSON. |
 | **Source catalog** | Browse 1,171 framework entries; filter the 1,040 with upstream free-access metadata, inspect integration limits, and search indexed pages. |
@@ -46,17 +46,25 @@ The current Windows release is **2.5.0**. Its 72 automated tests and Windows exe
 | Domain | Certificate Transparency records from crt.sh; Internet Archive snapshot metadata | Google, Bing, ICANN registration lookup, indexed pages |
 | Public IP | ARIN RDAP network-allocation records; provider redirects are restricted to the reviewed registry hosts | Google, Bing, RIPEstat |
 | Topic / organization | Wikipedia and Open Library catalog results | Google, Bing, DuckDuckGo, Wikipedia, Google Scholar, PubMed, Open Library, Google Patents |
-| Username | Prepared search links; no account-existence checks | Google, Bing, and Google queries scoped to GitHub, Reddit, Instagram, or TikTok |
-| Email | Prepared search links; no mailbox or account validation | Google and Bing |
+| Username | Optional Brave web-index snippets; no account-existence checks | Google, Bing, and Google queries scoped to GitHub, Reddit, Instagram, or TikTok |
+| Email | Optional Brave web-index snippets; no mailbox or account validation | Google and Bing |
+| Person | Wikipedia, GDELT recent news, optional Brave web-index snippets | Google, Bing, DuckDuckGo |
+| Phone | Offline numbering metadata and optional Brave indexed mentions; no owner verification | Google, Bing, DuckDuckGo |
 | Image | SauceNAO visual matches after upload consent | Returned source addresses are displayed as references |
 
 Providers can return incomplete data, errors, or no results. A match is a lead to evaluate, not proof of identity or ownership.
 
 ## From a few identifiers to a sourced report
 
-Use **Cases & reports** to supply names, usernames, emails, phones, domains, public IPs, reference URLs, notes and selected notebook findings together. Vidocq searches supported indexes, tracks failures and gaps, deduplicates exact records and produces a report with source citations. Names use Wikipedia and GDELT’s recent news index; phone analysis is offline. Email/username/phone browser searches are prepared links, not automatically retrieved discoveries. The app cannot establish identity or promise everything on the internet.
+Use **Cases & reports** to supply names, usernames, emails, phones, domains, public IPs, reference URLs, notes and selected notebook findings together. Vidocq searches supported indexes, tracks failures and gaps, deduplicates exact records and produces a report with source citations. Names use Wikipedia and GDELT’s recent news index; phone analysis is offline. An enabled **Search connection** retrieves Brave web-index snippets for names, usernames, emails and phone numbers; without it, email/username/phone web searches remain prepared links. The app cannot establish identity or promise everything on the internet.
 
 [Case workflow, phone limits and report exports →](docs/CASES.md)
+
+## If you get zero results
+
+Open **Search connection** and run **Check public sources**. Source errors, no matches and missing search connections are shown separately. Auto detect recognizes multi-word names. Wikipedia and news indexes do not cover most people. For general indexed mentions, enter your own Brave Search API key and enable it, then rerun the research or create a new report snapshot. Keys stay in memory for the session; optional `VIDOCQ_BRAVE_API_KEY` configuration is managed by you. The app only requests API snippets and never follows original result URLs.
+
+Brave is optional and is not unlimited free search. Its current plan provides $5 monthly credits, requires a payment card at signup, and charges for usage beyond credits. Review [current pricing and signup conditions](https://api-dashboard.search.brave.com/documentation/resources/help-feedback) before enabling. Vidocq limits requests to 100 per app session; this is not a billing guarantee. No Brave account or key is included.
 
 ## Framework coverage
 
