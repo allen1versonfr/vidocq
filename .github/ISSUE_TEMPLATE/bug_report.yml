@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a reproducible problem in Vidocq.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "Remove GitHub tokens, API keys, personal queries, and private findings from all text, logs, and screenshots."
+  - type: input
+    id: version
+    attributes:
+      label: Vidocq version
+      placeholder: "2.3.0"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: Windows 11 x64
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Startup or native window
+        - Research
+        - Image search
+        - Notebook or export
+        - Updates or recovery
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Use synthetic examples where possible.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the exact error message if available.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      description: Optional log excerpts or screenshots. Never include credentials or private findings.
