@@ -10,6 +10,10 @@ import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from version import VERSION
 import time
+import socket
+import urllib.request
+import urllib.error
+from http.cookiejar import CookieJar
 
 exe = Path('dist/Vidocq.exe').resolve()
 env = dict(os.environ, PYINSTALLER_RESET_ENVIRONMENT='1')
@@ -19,6 +23,41 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
     smoke = root/'smoke.json'
     subprocess.run([str(exe), '--smoke-test', str(smoke)], env=env, check=True, timeout=120)
     assert json.loads(smoke.read_text()) == {'ok':True, 'version':VERSION}
+    # Exercise case creation/report/export against the actual frozen HTTP backend,
+    # using only offline phone metadata and prepared username links (no network queries).
+    with socket.socket() as listener:
+        listener.bind(('127.0.0.1',0));port=listener.getsockname()[1]
+    server=subprocess.Popen([str(exe),'--serve-only','--port',str(port)],env=env)
+    client=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()))
+    base='http://127.0.0.1:'+str(port)
+    def request(path,payload=None):
+        req=urllib.request.Request(base+path,data=None if payload is None else json.dumps(payload).encode(),headers={} if payload is None else {'Content-Type':'application/json'})
+        return client.open(req,timeout=10)
+    try:
+        deadline=time.monotonic()+90
+        while True:
+            try:
+                with request('/') as response:assert response.status==200
+                break
+            except urllib.error.URLError:
+                if server.poll() is not None or time.monotonic()>=deadline:raise
+                time.sleep(.5)
+        with request('/api/cases',{'title':'Frozen case report','phones':['2025550123'],'usernames':['example']}) as response:case=json.load(response)
+        with request('/api/cases/'+case['id']+'/run',{'consent':True}) as response:run=json.load(response)
+        deadline=time.monotonic()+30
+        while True:
+            with request('/api/case-runs/'+run['id']) as response:report=json.load(response)
+            if report['status']=='complete':break
+            assert report['status'] in ('queued','running'),report
+            assert time.monotonic()<deadline,'Frozen case report timed out'
+            time.sleep(.25)
+        assert report['summary']['offline_records']==1 and report['summary']['prepared_not_run']>0
+        with request('/api/case-runs/'+run['id']+'?format=html') as response:
+            text=response.read().decode();assert 'Frozen case report' in text and 'Offline phone metadata' in text
+        print('Actual frozen phone/case/report/HTML export API passed.')
+    finally:
+        subprocess.run(['taskkill','/PID',str(server.pid),'/T','/F'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
+        server.wait(timeout=20)
     for scenario in ('success', 'rollback'):
         folder=root/scenario;folder.mkdir()
         target=folder/'Vidocq.exe';shutil.copyfile(exe,target)
