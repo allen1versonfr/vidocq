@@ -66,7 +66,7 @@ class Bridge:
         with self.lock:
             if self.jobs:raise ValueError('A Maigret job is already running.')
             self.jobs[run_id]=None
-        partial={};cancelled=False;loop=asyncio.new_event_loop();task=None;aliases={}
+        partial={};cancelled=False;timed_out=False;loop=asyncio.new_event_loop();task=None;aliases={}
         try:
             import maigret
             chosen,aliases=site_selection(names)
@@ -82,7 +82,8 @@ class Bridge:
                 self.jobs[run_id]=(loop,task)
                 if run_id in self.cancelled:task.cancel()
             try:result=loop.run_until_complete(asyncio.wait_for(task,timeout=60))
-            except (asyncio.CancelledError,asyncio.TimeoutError):result=partial;cancelled=True
+            except asyncio.CancelledError:result=partial;cancelled=True
+            except asyncio.TimeoutError:result=partial;timed_out=True
             rows=[]
             for requested in names:
                 actual=next((name for name,canonical in aliases.items() if canonical==requested),None)
@@ -91,7 +92,10 @@ class Bridge:
                 if state not in ('Claimed','Available','Unknown','Illegal'):state='Unknown'
                 url=item.get('url_user','') if isinstance(item,dict) else ''
                 if url and (urlparse(url).scheme not in ('http','https') or urlparse(url).hostname not in MAIGRET_SITES[requested]):state='Unknown';url=''
-                rows.append({'site':requested,'status':state,'url':url,'username':username})
+                error_type=str(getattr(getattr(status,'error',None),'type',''))
+                outcome='candidate' if state=='Claimed' else 'absent' if state=='Available' else 'invalid-handle' if state=='Illegal' else 'unsupported' if actual is None else 'timeout' if 'timeout' in error_type.lower() else 'blocked' if any(t in error_type.lower() for t in ('captcha','bot','access denied','blocked','login','rate')) else 'cancelled' if cancelled else 'timeout' if timed_out else 'error'
+                reason={'candidate':'Account may exist; ownership unverified.','absent':'No account detected by this check; not proof of absence.','unsupported':'Selected site unavailable in the installed reviewed database.','cancelled':'Run cancelled before a reliable result.','timeout':'Check or run deadline exceeded.','blocked':'Provider access/challenge/rate restriction; no bypass attempted.','error':'Check did not produce a reliable result.','invalid-handle':'Handle is not accepted by this site.'}[outcome]
+                rows.append({'site':requested,'status':state,'url':url,'username':username,'outcome':outcome,'reason':reason})
             return {'username':username,'results':rows,'cancelled':cancelled,'protocol':1}
         finally:
             if task and not task.done():task.cancel();loop.run_until_complete(asyncio.gather(task,return_exceptions=True))

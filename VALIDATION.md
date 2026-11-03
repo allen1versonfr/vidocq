@@ -1,3 +1,9 @@
+# Validation for Vidocq 2.13.0
+
+The 205-test suite passes locally (one symlink-capability test skipped). All six frontend scripts pass syntax checks. The suite covers profile/shared-host parsing, alternative locations, rejected-account persistence/exclusions, analyst-confirmation history, immutable browser captures, diagnostic outcomes, relevance counts and guarded deletion. Burn tests use isolated folders and assert preservation of unrelated files and refusal of out-of-scope manifests. A Windows symlink test can skip when link creation is unavailable. Local Windows smoke checks passed browser/review APIs and exports, non-destructive burn preview, update/restart/rollback and disposable copied-executable removal. The burn fixture removed its named data/log files, executable and adjacent backup while preserving an unrelated sentinel and the actual build. No live user workspace/executable is deleted. Visual browser validation remains unavailable after the prior access denial. No local LLM inference or real-person discovery accuracy evaluation is claimed for this release.
+
+Previous validation:
+
 # Validation for Vidocq 2.12.0
 
 182 automated tests cover existing features plus free-provider configuration, anonymous requests with no key forwarding, query/scoped filtering, cache isolation, rate/quota cooldowns, malformed/empty distinction, outages, optional Brave compatibility and removal of unrelated name-index fallback. The anonymous Mwmbl API returned live public Ada Lovelace results both from source and the actual Windows executable, with no API key/account. All five frontend scripts pass syntax checks. A direct DuckDuckGo HTML canary returned a challenge and was not adopted as an automatic provider. Visual browser checks were not repeated after the earlier access denial.

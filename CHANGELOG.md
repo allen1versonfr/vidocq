@@ -1,3 +1,7 @@
+# 2.13.0
+
+Added profile/location planning fixes, per-site diagnostics, persistent account decisions, browser evidence capture, meaningful report counts and scoped preview/confirmation-based local cleanup. Added local LLM assessment; no model download.
+
 # 2.12.0
 
 Added free anonymous Mwmbl web search with optional Brave, provider-specific coverage, caching/throttling/cooldowns and no automatic paid fallback. Removed noisy Wikipedia/news fallback from personal-name research. See docs/FREE_WEB_SEARCH.md.

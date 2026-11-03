@@ -189,18 +189,24 @@ class AdditionalCollectors:
         try:
             data=transport(base+'/api/search',{'username':username,'sites':sites,'run_id':job},key,'maigret',timeout=90)
             if not isinstance(data,dict) or data.get('username')!=username or not isinstance(data.get('results'),list):raise ValueError('Maigret returned an unexpected username or result format.')
-            rows=[];failed=bool(data.get('cancelled')) or {i.get('site') for i in data['results'] if isinstance(i,dict)}!=set(sites)
+            rows=[];checks=[];failed=bool(data.get('cancelled')) or {i.get('site') for i in data['results'] if isinstance(i,dict)}!=set(sites)
             seen=set()
             for item in data['results']:
                 if not isinstance(item,dict) or item.get('site') not in sites or item.get('status') not in ('Claimed','Available','Unknown','Illegal'):raise ValueError('Maigret returned out-of-scope data.')
                 if item['site'] in seen:raise ValueError('Maigret returned duplicate site checks.')
                 seen.add(item['site'])
-                failed=failed or item['status']=='Unknown'
+                result_outcome=item.get('outcome',{'Claimed':'candidate','Available':'absent','Unknown':'unknown','Illegal':'invalid-handle'}[item['status']])
+                if result_outcome not in ('candidate','absent','unknown','invalid-handle','unsupported','cancelled','timeout','blocked','error'):raise ValueError('Maigret returned an unknown diagnostic outcome.')
+                reason={'candidate':'Matching account candidate; ownership not established.','absent':'No account detected; not proof of absence.','unknown':'No reliable result or diagnostic.','invalid-handle':'Handle unsupported by site.','unsupported':'Checker unavailable in reviewed database.','cancelled':'Check cancelled.','timeout':'Deadline exceeded.','blocked':'Access/challenge/rate restriction.','error':'Check failed.'}[result_outcome]
+                checks.append({'site':item['site'],'status':item['status'],'outcome':result_outcome,'reason':reason})
+                if (item['status']=='Claimed' and result_outcome!='candidate') or (item['status']=='Available' and result_outcome!='absent'):raise ValueError('Maigret returned inconsistent site diagnostics.')
+                failed=failed or result_outcome not in ('candidate','absent')
                 if item['status']!='Claimed':continue
                 url=str(item.get('url',''));p=urlparse(url)
                 if p.scheme not in ('https','http') or p.hostname not in MAIGRET_SITES[item['site']] or p.username or p.password:raise ValueError('Maigret returned an out-of-scope profile reference.')
                 rows.append({'title':'Maigret candidate · '+item['site']+' · '+username,'detail':json.dumps(item,ensure_ascii=False)+'\nPublic username check only. A matching handle is not proof of account ownership or common identity.','reference':url,'lead_only':True})
-            return {'results':[{'provider':'Maigret','status':'partial' if failed else 'ok' if rows else 'empty','source':base+'/api/search','rows':rows,'message':'Some checks were blocked, unavailable or cancelled; missing results are not proof of absent accounts.' if failed else 'Selected-site username checks; all candidates require review.'}],'links':[]}
+            for missing in set(sites)-seen:checks.append({'site':missing,'status':'Unknown','outcome':'unknown','reason':'Companion did not return this selected site.'})
+            return {'results':[{'provider':'Maigret','status':'partial' if failed else 'ok' if rows else 'empty','source':base+'/api/search','rows':rows,'checks':checks,'message':'Some checks were blocked, unavailable or cancelled; missing results are not proof of absent accounts.' if failed else 'Selected-site username checks; all candidates require review.'}],'links':[]}
         except ValueError:
             self._cancel_backend('maigret',base,key,job);raise
         finally:
