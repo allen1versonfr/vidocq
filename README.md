@@ -24,7 +24,7 @@
 
 Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-The current Windows release is **2.3.0**. Its 45 automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+The current Windows release is **2.4.0**. Its 53 automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
 
 ## What you can do
 
@@ -33,6 +33,7 @@ The current Windows release is **2.3.0**. Its 45 automated tests and Windows exe
 | **Research** | Look up domains, public IPs, and topics through reviewed third-party indexes. Prepare username and email search queries. |
 | **Image search** | Search SauceNAO for possible image-source matches, with similarity scores and source references. |
 | **Notebook** | Save returned records or your own observations, add context and an evidence status, and export findings as JSON. |
+| **Source catalog** | Browse 1,171 framework entries; filter the 1,040 with upstream free-access metadata, inspect integration limits, and search indexed pages. |
 | **Source policy** | Review the providers used, the research boundaries, and what is stored locally. |
 | **Updates** | Check stable GitHub releases, download with progress, verify the file, and install with a restart. |
 
@@ -42,12 +43,18 @@ The current Windows release is **2.3.0**. Its 45 automated tests and Windows exe
 | --- | --- | --- |
 | Domain | Certificate Transparency records from crt.sh; Internet Archive snapshot metadata | Google, Bing, ICANN registration lookup, indexed pages |
 | Public IP | ARIN RDAP network-allocation records; provider redirects are restricted to the reviewed registry hosts | Google, Bing, RIPEstat |
-| Topic / organization | Wikipedia search results | Google, Bing, Wikipedia |
+| Topic / organization | Wikipedia and Open Library catalog results | Google, Bing, DuckDuckGo, Wikipedia, Google Scholar, PubMed, Open Library, Google Patents |
 | Username | Prepared search links; no account-existence checks | Google, Bing, and Google queries scoped to GitHub, Reddit, Instagram, or TikTok |
 | Email | Prepared search links; no mailbox or account validation | Google and Bing |
 | Image | SauceNAO visual matches after upload consent | Returned source addresses are displayed as references |
 
 Providers can return incomplete data, errors, or no results. A match is a lead to evaluate, not proof of identity or ownership.
+
+## Framework coverage
+
+The Source catalog includes the full OSINT Framework snapshot at upstream revision `08720d5b594cb7513d7ec81f8e70c400375a85fc`. Its default view includes 784 free, 249 freemium, and 7 mixed free/freemium entries. Thirty paid entries and 101 entries without pricing metadata are separated. Pricing and status labels come from upstream and can be outdated.
+
+**Catalog coverage is not automatic integration.** Reviewed adapters return data inside Vidocq. The other free-access entries can be searched with Google’s `site:` index search; Vidocq never substitutes a subject into their original URLs, runs local tools, submits scans, or performs account checks. Source actions send the research term only to Google. This preserves the restriction against contacting a target directly. See [source coverage](docs/SOURCES.md) for the audit and limitations.
 
 ## Get started
 
