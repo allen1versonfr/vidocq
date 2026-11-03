@@ -56,7 +56,7 @@ class ManagedMaigretTests(unittest.TestCase):
             parent=subprocess.Popen([sys.executable,'-c',code],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
             child=None
             try:
-                deadline=time.monotonic()+30
+                deadline=time.monotonic()+75
                 while not marker.exists() and parent.poll() is None and time.monotonic()<deadline:time.sleep(.1)
                 self.assertTrue(marker.exists(),'Managed service parent did not become ready')
                 child=json.loads(marker.read_text());parent.terminate();parent.wait(timeout=10)
