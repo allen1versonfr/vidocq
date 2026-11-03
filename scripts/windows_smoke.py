@@ -6,6 +6,9 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from version import VERSION
 import time
 
 exe = Path('dist/Vidocq.exe').resolve()
@@ -15,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
     env['VIDOCQ_DATA'] = str(root/'data')
     smoke = root/'smoke.json'
     subprocess.run([str(exe), '--smoke-test', str(smoke)], env=env, check=True, timeout=120)
-    assert json.loads(smoke.read_text()) == {'ok':True, 'version':'2.3.0'}
+    assert json.loads(smoke.read_text()) == {'ok':True, 'version':VERSION}
     for scenario in ('success', 'rollback'):
         folder=root/scenario;folder.mkdir()
         target=folder/'Vidocq.exe';shutil.copyfile(exe,target)
@@ -25,7 +28,7 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
         ready=folder/'ready';result=folder/'result.json';check=folder/'child.json'
         data=staged.read_bytes()
         job={'target':str(target),'staged':str(staged),'size':len(data),'sha256':hashlib.sha256(data).hexdigest(),
-             'parent_pid':0,'ready':str(ready),'result':str(result),'version':'2.3.0',
+             'parent_pid':0,'ready':str(ready),'result':str(result),'version':VERSION,
              'launch_args':['--smoke-test',str(check)]}
         jobfile=folder/'job.json';jobfile.write_text(json.dumps(job))
         helper=folder/'helper.exe';shutil.copyfile(exe,helper)
