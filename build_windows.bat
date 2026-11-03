@@ -5,9 +5,11 @@ py -3 -m venv .venv
 if errorlevel 1 goto failed
 .venv\Scripts\python.exe -m pip install -r requirements.txt pyinstaller==6.20.0
 if errorlevel 1 goto failed
+.venv\Scripts\python.exe scripts\build_icon.py
+if errorlevel 1 goto failed
 .venv\Scripts\python.exe -m unittest discover -s tests -v
 if errorlevel 1 goto failed
-.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onefile --windowed --name Vidocq --add-data "ui;ui" --add-data "source-catalog.json;." --add-data "docs/OSINT_FRAMEWORK_LICENSE.txt;." --collect-all webview --collect-all phonenumbers launch.py
+.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onefile --windowed --name Vidocq --icon "build/assets/vidocq.ico" --add-data "build/assets;assets" --add-data "ui;ui" --add-data "source-catalog.json;." --add-data "docs/OSINT_FRAMEWORK_LICENSE.txt;." --collect-all webview --collect-all phonenumbers launch.py
 if errorlevel 1 goto failed
 .venv\Scripts\python.exe scripts\windows_smoke.py
 if errorlevel 1 goto failed
