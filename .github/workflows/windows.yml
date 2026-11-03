@@ -25,7 +25,7 @@ jobs:
       - name: Validate frontend syntax
         run: node --check ui/app.js
       - name: Build portable Windows executable
-        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name Vidocq --add-data "ui;ui" --collect-all webview launch.py
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name Vidocq --add-data "ui;ui" --add-data "source-catalog.json;." --add-data "docs/OSINT_FRAMEWORK_LICENSE.txt;." --collect-all webview launch.py
       - name: Test actual Windows executable, replacement, restart and rollback
         run: python scripts/windows_smoke.py
       - uses: actions/upload-artifact@v4
