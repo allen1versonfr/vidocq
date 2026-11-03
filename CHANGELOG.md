@@ -1,3 +1,12 @@
+# 2.9.0 — Automatic investigations and profile connectors
+
+- Add a bounded identifiers-to-report engine with queue/depth/follow-up limits, explicit clue extraction, relevance checks and parent citations.
+- Generate deterministic executive summaries, relevance groups, profile-name differences, coverage gaps and unanswered questions in UI/HTML/Markdown/JSON reports.
+- Add cancellation with preserved, exportable partial reports and legacy-case compatibility.
+- Add Steam inputs and opt-in Valve profile/library/recent-game enrichment, game AppID filtering and attributed optional CBL provider records.
+- Add an optional local Osintgram 2.x bridge for profile/about/captions/hashtags, bounded requests, no media loading, and separate backend credential handling.
+- Show connection readiness before investigation and document the new opt-in collection boundaries.
+
 # 2.8.0 — SpiderFoot JSON import
 
 - Add local preview/confirm import of standard SpiderFoot JSON results.

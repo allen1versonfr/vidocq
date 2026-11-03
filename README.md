@@ -24,7 +24,11 @@
 
 Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-The current Windows release is **2.8.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+The current Windows release is **2.9.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+
+## Automatic investigations with Steam and Osintgram
+
+Enter known identifiers and context, set search/depth limits, and generate a report with an evidence-linked summary, discovered clues, relevance groups and coverage gaps. Optional Steam API and local Osintgram 2.x connectors can enrich supplied or eligible discovered profiles when explicitly allowed. Broad web coverage needs your Brave connection; Steam needs your key, and Osintgram requires its separate configured local service. [Setup and investigation guide →](docs/AUTOMATIC_INVESTIGATIONS.md)
 
 ## SpiderFoot import
 
@@ -38,8 +42,8 @@ Structured evidence, editable/searchable notebooks, evidence-backed entity relat
 
 | Workspace | What it offers |
 | --- | --- |
-| **Cases & reports** | Combine supplied identifiers and selected notebook evidence into persistent, cited report snapshots; export printable HTML, Markdown or JSON. |
-| **Social profiles** | Add Instagram, TikTok and VSCO handles or profile links to research and cases; retrieve platform-scoped snippets with your optional Brave connection. |
+| **Cases & reports** | Investigate supplied identifiers/context, follow supported new clues within limits, separate stronger/uncertain leads, and export cited HTML, Markdown or JSON reports. |
+| **Social profiles** | Instagram/TikTok/VSCO index searches, Steam API enrichment, and an optional Osintgram 2.x public-profile bridge in explicitly enabled case runs. |
 | **Phone** | Normalize numbers and inspect offline numbering-plan metadata without calling, messaging or identifying an owner. |
 | **Research** | Look up domains, public IPs, and topics through reviewed third-party indexes. Retrieve indexed mentions with an optional Brave API connection. |
 | **Image search** | Search SauceNAO for possible image-source matches, with similarity scores and source references. |
@@ -57,9 +61,10 @@ Structured evidence, editable/searchable notebooks, evidence-backed entity relat
 | Topic / organization | Wikipedia and Open Library catalog results | Google, Bing, DuckDuckGo, Wikipedia, Google Scholar, PubMed, Open Library, Google Patents |
 | Username | Optional Brave web-index snippets; no account-existence checks | Google, Bing, and Google queries scoped to GitHub, Reddit, Instagram, or TikTok |
 | Email | Optional Brave web-index snippets; no mailbox or account validation | Google and Bing |
-| Instagram / TikTok / VSCO | Optional Brave platform-scoped index snippets; supplied profile addresses are never visited or verified | Google, Bing, DuckDuckGo platform searches |
+| Instagram / TikTok / VSCO | Optional Brave snippets; explicitly enabled cases can additionally use Osintgram for Instagram public data | Google, Bing, DuckDuckGo platform searches |
 | Person | Wikipedia, GDELT recent news, optional Brave web-index snippets | Google, Bing, DuckDuckGo |
 | Phone | Offline numbering metadata and optional Brave indexed mentions; no owner verification | Google, Bing, DuckDuckGo |
+| Steam | Brave index snippets; opt-in Valve profile/library/recent-game data and optional CBL provider records | Google, Bing, DuckDuckGo |
 | Image | SauceNAO visual matches after upload consent | Returned source addresses are displayed as references |
 
 Providers can return incomplete data, errors, or no results. A match is a lead to evaluate, not proof of identity or ownership.
@@ -72,7 +77,7 @@ Use **Cases & reports** to supply names, usernames, Instagram/TikTok/VSCO profil
 
 ## If you get zero results
 
-Open **Search connection** and run **Check public sources**. Source errors, no matches and missing search connections are shown separately. Auto detect recognizes multi-word names. Wikipedia and news indexes do not cover most people. For general indexed mentions, enter your own Brave Search API key and enable it, then rerun the research or create a new report snapshot. Keys stay in memory for the session; optional `VIDOCQ_BRAVE_API_KEY` configuration is managed by you. The app only requests API snippets and never follows original result URLs.
+Open **Search connection** and run **Check public sources**. Source errors, no matches and missing search connections are shown separately. Auto detect recognizes multi-word names. Wikipedia and news indexes do not cover most people. For general indexed mentions, enter your own Brave Search API key and enable it, then rerun the research or create a new report snapshot. Keys stay in memory for the session; optional `VIDOCQ_BRAVE_API_KEY` configuration is managed by you. Index searches request snippets and never follow original result URLs. Direct Steam/Osintgram APIs are separate, explicitly enabled connectors.
 
 Brave is optional and is not unlimited free search. Its current plan provides $5 monthly credits, requires a payment card at signup, and charges for usage beyond credits. Review [current pricing and signup conditions](https://api-dashboard.search.brave.com/documentation/resources/help-feedback) before enabling. Vidocq limits requests to 100 per app session; this is not a billing guarantee. No Brave account or key is included.
 
@@ -80,7 +85,7 @@ Brave is optional and is not unlimited free search. Its current plan provides $5
 
 In **Research**, choose Instagram, TikTok or VSCO and enter a handle, or paste a full profile URL with Auto detect. In **Cases & reports**, each platform has a separate field. Up to five handles per platform count toward the existing fifteen-identifier total. VSCO profile links ending in `/gallery` are supported. Post/video/short links are rejected; supply the full profile address instead. The app keeps platform identity and canonical supplied references in report snapshots and all exports. Older cases continue to load.
 
-With Brave enabled, the app searches `site:instagram.com`, `site:tiktok.com` or `site:vsco.co` and returns index snippets and source references. Without a key, it offers prepared index queries and reports that no online search ran. Supplied profiles and returned mentions are unverified; the app does not infer that handles across platforms belong to one person. No profile visits, account checks, follower scraping, remote thumbnails or media downloads occur.
+With Brave enabled, the app searches `site:instagram.com`, `site:tiktok.com` or `site:vsco.co` and returns index snippets and source references. Without a key, it offers prepared index queries and reports that no online search ran. Supplied profiles and returned mentions are unverified; the app does not infer that handles across platforms belong to one person. Default index mode does not resolve profiles or fetch their pages. Explicitly permitted Steam/Osintgram connectors can retrieve API data; see the automatic investigation guide. No remote thumbnails or media are loaded.
 
 The portable executable includes a new navy/gold Vidocq magnifier icon in Windows sizes from 16–256 pixels, with a stable taskbar app identity. A standalone `Vidocq.ico` is also attached to releases. The Windows gate verifies the exact generated icon frames inside the executable.
 

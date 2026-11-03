@@ -34,3 +34,7 @@ python scripts/sync_framework.py path/to/arf.json --revision UPSTREAM_COMMIT --o
 ```
 
 Review the generated counts, reasons, metadata and license; refresh the coverage report/docs and run the catalog tests before publishing. Synchronization reads JSON only and never installs or executes directory entries. The desktop app uses the bundled snapshot; it does not crawl all providers or automatically download unreviewed framework changes.
+
+## Optional connectors in 2.9.0
+
+Automatic investigations add separately configured Steam/CBL API adapters and a local Osintgram 2.x bridge. These are explicit, per-case opt-in integrations, not execution of arbitrary catalog entries. Destinations, transmitted data, credentials, limits, failures and platform-contact behavior are documented in [Automatic investigations](AUTOMATIC_INVESTIGATIONS.md).

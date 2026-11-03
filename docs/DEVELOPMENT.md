@@ -42,6 +42,7 @@ Use `python app.py` for the native window when the necessary GUI runtime is avai
 node --check ui/app.js
 node --check ui/investigation.js
 node --check ui/spiderfoot.js
+node --check ui/assisted.js
 .\build_windows.bat
 ```
 

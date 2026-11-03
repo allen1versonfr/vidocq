@@ -309,7 +309,7 @@ class InvestigationService:
                         elif table == 'cases':
                             if not isinstance(parsed.get('title'), str) or not isinstance(parsed.get('notebook_ids', []), list): raise ValueError()
                         elif table == 'case_runs':
-                            if parsed.get('case_id') != row[1] or parsed.get('status') not in ('complete', 'interrupted', 'error', 'failed'): raise ValueError()
+                            if parsed.get('case_id') != row[1] or parsed.get('status') not in ('complete', 'cancelled', 'interrupted', 'error', 'failed'): raise ValueError()
                             if not isinstance(parsed.get('records'), list) or not isinstance(parsed.get('case'), dict): raise ValueError()
                         elif table == 'investigation_items':
                             if row[1] not in ('entity', 'relationship', 'event') or not isinstance(parsed.get('label'), str): raise ValueError()

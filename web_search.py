@@ -26,13 +26,17 @@ class WebSearch:
             if data['enabled'] and not self.key:raise ValueError('Enter a Brave Search API key before enabling web search.')
             self.enabled=data['enabled']
         return self.status()
-    def search(self,value,site=None):
-        if site is not None and site not in ('instagram.com','tiktok.com','vsco.co'):raise ValueError('Unsupported social index scope.')
+    def search_terms(self,terms):
+        if not isinstance(terms,list) or not 1<=len(terms)<=4 or any(not isinstance(t,str) or not t.strip() or len(t)>120 or any(ord(c)<32 for c in t) for t in terms):raise ValueError('Invalid context search terms.')
+        return self.search('',terms=terms)
+    def search(self,value,site=None,terms=None):
+        if site is not None and site not in ('instagram.com','tiktok.com','vsco.co','steamcommunity.com'):raise ValueError('Unsupported social index scope.')
         with self.lock:
             if not self.enabled or not self.key:raise SearchNotConfigured('Web search was not run: connect your own Brave Search API key in Search connection. Wikipedia/news indexes do not cover most people or identifiers.')
             if self.requests>=100:raise SearchLimit('Session search limit reached (100 API calls). Check your provider usage before reconnecting in a new app session.')
             key=self.key;self.requests+=1
         query='"'+str(value).replace('"','').replace('\\','')+'"'
+        if terms is not None:query=' '.join('"'+str(t).replace('"','').replace('\\','')+'"' for t in terms)
         if site:query='site:'+site+' '+query
         source='https://api.search.brave.com/res/v1/web/search?'+urlencode({'q':query,'count':10,'safesearch':'moderate','text_decorations':'false'})
         req=Request(source,headers={'User-Agent':'Vidocq/'+VERSION,'Accept':'application/json','X-Subscription-Token':key})

@@ -38,7 +38,7 @@ There is no built-in notebook cloud sync or analytics. The default data director
 
 Providers also see ordinary connection information, such as your IP address, and may log requests. Passive research is not a promise of anonymity or zero notification. Opening original pages from an external browser can contact those sites.
 
-The app does not directly visit submitted social profiles, scan submitted IPs/domains, query their DNS servers, attempt logins or account recovery, or test account existence. No remote result thumbnails, third-party scripts, or external fonts are loaded by the app UI. This repository’s README uses external badge images when viewed on GitHub; those are separate from the application.
+Default index mode does not resolve supplied accounts or fetch original pages. Opt-in Steam/Osintgram connectors can resolve supplied and eligible discovered accounts through their reviewed APIs. Vidocq does not scan submitted IPs/domains, query their DNS servers, attempt logins or account recovery; Osintgram manages its separately configured backend access. No remote result thumbnails, third-party scripts, or external fonts are loaded by the app UI. This repository’s README uses external badge images when viewed on GitHub; those are separate from the application.
 
 ## Protecting your workspace
 
@@ -51,3 +51,9 @@ Imported documents/screenshots, original bytes and hashes, extracted text, entit
 ## SpiderFoot imports (2.8.0)
 
 JSON imports preserve original files and records locally. No SpiderFoot server, source URL or index provider is contacted by preview/import. Imported connections are unverified discovery leads. Original files and metadata remain unencrypted in SQLite and are included in workspace bundles. See [SpiderFoot import](SPIDERFOOT.md).
+
+## Automatic investigations and optional direct connectors (2.9.0)
+
+Confirmed automatic runs can send discovered identifiers to the existing index providers within selected limits; name/employer/location context can be combined in Brave queries. The complete notes/documents are not sent. Opt-in Steam requests go to Valve, optionally CBL; its key stays in Vidocq memory and is excluded from stored/exported source references. The Osintgram bridge sends only the selected Instagram handle and fixed bounded commands to a user-configured loopback port. Osintgram's backend handles its credentials, billing and platform access, which can involve HikerAPI or Instagram. No remote media is loaded by Vidocq.
+
+These connectors require both session enablement and per-case permission. They go beyond third-party-index-only collection. Logs, charges, access restrictions and platform visibility are provider-dependent. Case snapshots retain discovered clues, citations and non-secret connector settings; local SQLite remains unencrypted. See [the setup and privacy details](AUTOMATIC_INVESTIGATIONS.md).

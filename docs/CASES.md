@@ -1,5 +1,8 @@
 # Phone analysis, cases and reports
 
+For the new identifier-to-report workflow, search budgets, cancellation, Steam and Osintgram setup, see [Automatic investigations (2.9.0)](AUTOMATIC_INVESTIGATIONS.md). The original index-only workflow below remains available when Automatic investigation is disabled. In automatic mode, notes/reference URLs and selected evidence can contribute explicit identifier clues, while original pages are not arbitrarily fetched.
+
+
 [← Project overview](../README.md)
 
 ## Phone numbers
