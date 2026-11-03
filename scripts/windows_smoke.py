@@ -195,7 +195,7 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
             assert review_report['status'] in ('queued','running') and time.monotonic()<deadline,review_report
             time.sleep(.1)
         assert ('domain','twitch.tv') not in [(t['kind'],t['value']) for t in review_report['search_log']]
-        assert [t['value'] for t in review_report['search_log'] if t['kind']=='context']==[['Example Person','City One'],['Example Person','City Two']]
+        assert [t['value'] for t in review_report['search_log'] if t['kind']=='context']==[['Example Person','City One'],['Example Person','City Two'],['https://twitch.tv/example']]
         assert any(r['origin']=='user-supplied' and r['reference']=='https://example.org/about' for r in review_report['records'])
         with request('/api/case-runs/'+review_run['id']+'?format=html') as response:assert 'Synthetic known wrong-account fixture.' in response.read().decode()
         with request('/api/case-runs/'+review_run['id']+'?format=markdown') as response:assert 'Synthetic known wrong-account fixture.' in response.read().decode()
@@ -207,6 +207,40 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
         except urllib.error.HTTPError as error:assert error.code==400
         assert (root/'data'/'workspace.sqlite3').exists()
         print('Frozen browser evidence, account decisions, location planning, relevance counts and non-destructive burn preview passed.')
+        with request('/workbench.js') as response:assert b'Discovery workbench' in response.read()
+        with request('/api/cases',{'title':'Synthetic discovery workbench','names':['Example Middle Person'],'urls':['https://example.org/bio'],'aliases':[{'handle':'oldexample','platform':'Example','last_seen':'2020-01-01'}],'investigation':{'enabled':True,'max_searches':6,'max_followups':0}}) as response:discovery_case=json.load(response)
+        discovery_path='/api/cases/'+discovery_case['id']
+        with request(discovery_path+'/query-plan',{}) as response:plan=json.load(response)
+        assert any(q['terms']==['Example Person'] for q in plan['queries'])
+        with request(discovery_path+'/link-import',{'mode':'browser','consent':True,'data':{'schema':'vidocq-browser-v1','reference':'https://example.org/bio','title':'Reviewed synthetic bio','excerpt':'Example Person publishes this public link.','links':['https://github.com/example']}}) as response:imported=json.load(response)
+        assert imported['result']['edges'][0]['relation']=='browser-captured-link'
+        with request(discovery_path+'/link-import',{'mode':'photon','consent':True,'reference':'https://example.org','data':{'external':['https://github.com/example']}}) as response:assert json.load(response)['result']['edges'][0]['relation']=='photon-aggregate-lead'
+        class ModelFixture(OsintgramFixture):
+            def do_POST(self):
+                payload=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                assert self.path=='/v1/chat/completions' and 'tools' not in payload
+                context=json.loads(payload['messages'][1]['content'])
+                if 'queries' in context:result={'indexes':[0]}
+                else:
+                    row=context['records'][0];result={'claims':[{'citation':row['id'],'quote':row['excerpt'][:40]}]}
+                self.reply({'choices':[{'message':{'content':json.dumps(result)}}]})
+        model_fixture=ThreadingHTTPServer(('127.0.0.1',0),ModelFixture);threading.Thread(target=model_fixture.serve_forever,daemon=True).start()
+        try:
+            with request('/api/local-drafts',{'enabled':True,'port':model_fixture.server_port,'model':'synthetic'}) as response:assert json.load(response)['enabled']
+            with request(discovery_path+'/local-draft',{'mode':'queries','consent':True}) as response:assert json.load(response)['queries'][0]['terms']==['Example Middle Person']
+            with request(discovery_path+'/run',{'consent':True}) as response:discovery_run=json.load(response)
+            deadline=time.monotonic()+30
+            while True:
+                with request('/api/case-runs/'+discovery_run['id']) as response:discovery_report=json.load(response)
+                if discovery_report['status']=='complete':break
+                assert time.monotonic()<deadline;time.sleep(.1)
+            assert len(discovery_report['link_evidence'])==2
+            with request(discovery_path+'/local-draft',{'mode':'summary','run_id':discovery_run['id'],'consent':True}) as response:assert json.load(response)['claims'][0]['citation'] in {r['id'] for r in discovery_report['records']}
+            with request('/api/case-runs/'+discovery_run['id']+'?format=html') as response:assert b'photon-aggregate-lead' in response.read()
+        finally:
+            model_fixture.shutdown();model_fixture.server_close()
+            with request('/api/local-drafts',{'enabled':False,'port':8080,'model':'local'}) as response:assert not json.load(response)['enabled']
+        print('Frozen browser/Photon imports, historical aliases, link reports and local model fixture passed.')
         with request('/api/workspace/backup',{'password':'synthetic backup password'}) as response:bundle=json.load(response)
         assert bundle['encrypted']
         with request('/api/workspace/restore',dict(bundle,password='synthetic backup password')) as response:preview=json.load(response)

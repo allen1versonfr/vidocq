@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from research_connectors import normalize_steam
 from social_profiles import detect_platform, normalize_profile, profile_reference
 from collector_policy import HARVESTER_SOURCES,MAIGRET_SITES,DEFAULT_MAIGRET_SITES,selected
+from discovery_tools import query_plan
 
 KINDS={'names':'person','usernames':'username','emails':'email','phones':'phone','domains':'domain','ips':'ip','instagram':'instagram','tiktok':'tiktok','vsco':'vsco','steam':'steam'}
 COMMANDS=('get_user_info','get_account_about','get_captions','get_hashtags')
@@ -24,6 +25,8 @@ def report_sections(run):
     sections.append(('Search gaps',[x.get('input','')+' · '+x.get('provider','')+' · '+x.get('status','')+' · '+x.get('message','') for x in analysis.get('coverage_gaps',[])] + ['Unsearched: '+json.dumps(x,ensure_ascii=False) for x in run.get('search_log',[]) if x['status']=='not-run'] or ['No logged source failures or unsearched inputs. Coverage still depends on selected providers.']))
     sections.append(('Platform check diagnostics',[c.get('seed','')+' · '+x.get('site','')+' · '+x.get('outcome','unknown')+' · '+x.get('reason','') for c in run.get('coverage',[]) for x in c.get('checks',[])] or ['No per-site checks recorded.']))
     sections.append(('Unanswered questions',analysis['unanswered']))
+    sections.append(('Published links and imported leads', ['['+x['citation']+'] '+x['source']+' → '+x['target']+' · '+x['relation']+' · '+x['observed_at'] for x in run.get('link_evidence',[])] or ['No captured link evidence.']))
+    sections.append(('Historical aliases (supplied, unverified)',[json.dumps(x,ensure_ascii=False) for x in run['case'].get('aliases',[])] or ['None supplied.']))
     return sections
 
 def report_analysis_html(run):
@@ -141,11 +144,15 @@ def execute(service,run):
         for value in case.get(field,[]):enqueue(kind,value)
     # Provided context is input, not independent evidence. Never send full notes to a provider.
     supplied_blob=case.get('notes','')+'\n'+'\n'.join(case.get('urls',[]))
-    supplied_blob+='\n'+'\n'.join((f.get('capture',{}).get('excerpt','')+'\n'+f.get('notes',''))[:10000] for f in run['supplied_findings'] if f.get('status')!='Rejected' and not rejected(case,f.get('capture',{}).get('reference','')))
+    supplied_blob+='\n'+'\n'.join((f.get('capture',{}).get('excerpt','')+'\n'+f.get('notes',''))[:10000] for f in run['supplied_findings'] if f.get('capture',{}).get('origin')!='public-links' and f.get('status')!='Rejected' and not rejected(case,f.get('capture',{}).get('reference','')))
     for clue in extract_clues(supplied_blob,service.normalize)[:5]:enqueue(clue['kind'],clue['value'],origin='supplied-context')
     for name in case.get('names',[]):
         if case.get('employer'):enqueue('context',[name,case['employer']])
         for location in locations(case):enqueue('context',[name,location])
+    for variant in query_plan(case):
+        if variant['reason'] not in ('supplied full name','supplied username','supplied location variant','supplied employer context'):
+            enqueue('context',variant['terms'],origin=variant['reason'])
+    run['query_plan']=query_plan(case);run['link_evidence']=[]
     initial_count=len(queue)
     if opts['max_searches']<initial_count:run['limits_note']='Search budget is smaller than the supplied/context search plan; some inputs will remain unsearched.'
     def record(provider,source,row,task,origin='retrieved'):
@@ -171,6 +178,16 @@ def execute(service,run):
         entry=record('User-selected notebook finding',finding.get('source',''),{'title':finding.get('title','Finding'),'detail':capture.get('excerpt',finding.get('notes',''))+'\nAnalyst notes: '+finding.get('notes',''),'reference':capture.get('reference','')},
                {'kind':'notebook','value':finding['id'],'depth':0},'user-supplied')
         if not entry.get('account_decision'):entry['analyst_status']=finding.get('status','Unverified lead')
+        if capture.get('origin')=='public-links':
+            try:
+                imported=json.loads(capture.get('excerpt','{}'))
+                edges=imported.get('edges',[]) if isinstance(imported,dict) else []
+                if not isinstance(edges,list):edges=[]
+                for edge in edges[:300]:
+                    if not isinstance(edge,dict) or any(not isinstance(edge.get(k),str) or len(edge[k])>2000 for k in ('source','target','relation','observed_at')):continue
+                    if edge['relation'] not in ('published-link','browser-captured-link','photon-aggregate-lead') or not safe_reference(edge['source']) or not safe_reference(edge['target']):continue
+                    run['link_evidence'].append(dict(edge,citation=entry['id'],source_analyst_status=entry.get('analyst_status','Unverified'),target_rejected_by_analyst=rejected(case,edge.get('target','')),ownership_verified=False))
+            except (ValueError,TypeError):pass
     while queue and run['completed']<opts['max_searches'] and not cancelled.is_set():
         task=queue.popleft();kind,value=task['kind'],task['value'];seed=kind+': '+(' + '.join(value) if isinstance(value,list) else value)
         run.update(total=min(opts['max_searches'],run['completed']+len(queue)+1),message='Researching '+seed[:180]);service._save_run(run)

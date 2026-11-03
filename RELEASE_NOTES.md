@@ -1,4 +1,15 @@
-# Vidocq 2.13.0 - Reviewable investigations and scoped burn
+# Vidocq 2.14.0 - Discovery workbench
+
+- Chrome/Firefox active-tab helper exports reviewed selections and links to local JSON; import without repeated copy/paste.
+- Photon aggregate JSON imports and a separately approved native bounded public-link crawler, with distinct provenance and coverage gaps.
+- Full-name/first-last/alias/exact-URL query variants; dated historical alias records including supplied stable IDs and successor URLs.
+- Cited page-to-page link observations in reports, kept separate from analyst ownership decisions.
+- Unreliable bundled Instagram checker marked unavailable, plus an opt-in public GitHub checker canary.
+- Optional local llama.cpp-compatible query suggestions and validated cited excerpt drafts. No model download, automatic execution or cloud fallback.
+
+Setup and limits: [Discovery workbench](docs/DISCOVERY_WORKBENCH.md). The browser helper is user-installed (Firefox temporary add-on), Photon is import-only, and real local-model quality is hardware/model dependent. No private test-person data is included.
+
+## Previous: 2.13.0
 
 - Parse supported public profile links as handles, avoid shared-platform domain pivots and search location alternatives separately.
 - Preserve each Maigret site's outcome and distinguish raw records, relevant candidates and analyst-confirmed accounts.

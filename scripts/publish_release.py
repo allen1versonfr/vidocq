@@ -16,10 +16,13 @@ def gh(*args):
 from scripts.package_maigret_bridge import package
 bridge=package()
 bridge_digest=hashlib.sha256(bridge.read_bytes()).hexdigest()
+from scripts.package_browser_extension import package as package_extension
+extension=package_extension()
+extension_digest=hashlib.sha256(extension.read_bytes()).hexdigest()
 tag='v'+VERSION
 exe=Path('dist/Vidocq.exe')
 data=exe.read_bytes();digest=hashlib.sha256(data).hexdigest()
-Path('dist/SHA256SUMS.txt').write_text(digest+'  Vidocq.exe\n'+bridge_digest+'  Maigret-Bridge.zip\n',encoding='utf-8')
+Path('dist/SHA256SUMS.txt').write_text(digest+'  Vidocq.exe\n'+bridge_digest+'  Maigret-Bridge.zip\n'+extension_digest+'  Reviewed-Evidence-Extension.zip\n',encoding='utf-8')
 Path('dist/BUILD_INFO.json').write_text(json.dumps({'name':'Vidocq','version':VERSION,'platform':'Windows 10/11 x64','windows_runtime_tested':True,'automated_tests':unittest.defaultTestLoader.discover('tests').countTestCases(),'frozen_smoke_test':True,'live_public_index_canaries':True,'embedded_icon_verified':True,'social_profile_api_test':True,'phone_case_report_api_test':True,'replacement_restart_test':True,'failed_start_rollback_test':True,'size_bytes':len(data),'sha256':digest},indent=2),encoding='utf-8')
 shutil.copyfile('build/assets/vidocq.ico','dist/Vidocq.ico')
 notes=Path('RELEASE_NOTES.md')
@@ -28,7 +31,7 @@ if existing.returncode==0:
     assert json.loads(existing.stdout)['isDraft'], 'Refusing to overwrite a published version; bump version.py.'
 else:
     gh('release','create',tag,'--draft','--target','main','--title','Vidocq '+VERSION,'--notes-file',str(notes))
-gh('release','upload',tag,str(exe),str(bridge),'dist/SHA256SUMS.txt','dist/BUILD_INFO.json','dist/Vidocq.ico','--clobber')
+gh('release','upload',tag,str(exe),str(bridge),str(extension),'dist/SHA256SUMS.txt','dist/BUILD_INFO.json','dist/Vidocq.ico','--clobber')
 for attempt in range(12):
     releases=json.loads(gh('api','repos/{owner}/{repo}/releases?per_page=100'))
     matching=[r for r in releases if r['tag_name']==tag]
@@ -36,7 +39,8 @@ for attempt in range(12):
     assets=matching[0]['assets']
     matched=[a for a in assets if a['name']=='Vidocq.exe']
     bridge_assets=[a for a in assets if a['name']=='Maigret-Bridge.zip']
-    if len(bridge_assets)==1 and bridge_assets[0].get('digest')=='sha256:'+bridge_digest and len(matched)==1 and matched[0].get('digest')=='sha256:'+digest and matched[0]['size']==len(data):break
+    extension_assets=[a for a in assets if a['name']=='Reviewed-Evidence-Extension.zip']
+    if len(extension_assets)==1 and extension_assets[0].get('digest')=='sha256:'+extension_digest and len(bridge_assets)==1 and bridge_assets[0].get('digest')=='sha256:'+bridge_digest and len(matched)==1 and matched[0].get('digest')=='sha256:'+digest and matched[0]['size']==len(data):break
     time.sleep(5)
 else:
     raise RuntimeError('GitHub asset digest did not match. Release remains a draft.')

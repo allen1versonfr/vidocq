@@ -5,6 +5,7 @@ MAIGRET_SITES={'GitHub':('github.com','www.github.com','api.github.com'),'Reddit
                'Pinterest':('pinterest.com','www.pinterest.com'),'TikTok':('tiktok.com','www.tiktok.com'),
                'Instagram':('instagram.com','www.instagram.com'),'VSCO':('vsco.co',),'Medium':('medium.com',)}
 DEFAULT_MAIGRET_SITES=['GitHub','Reddit','Steam']
+CHECKER_HOLDS={'Instagram':'Public checker is unreliable with the bundled database; use reviewed browser evidence or the separately configured Osintgram connector.'}
 
 def selected(values,allowed,maximum):
     if not isinstance(values,list) or not values or len(values)>maximum or any(not isinstance(v,str) or v not in allowed for v in values):

@@ -24,7 +24,11 @@
 
 Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-The current Windows release is **2.13.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+The current Windows release is **2.14.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+
+## Discovery workbench
+
+Import selected public browser evidence with the Chrome/Firefox helper, import Photon JSON, capture public links with a separately approved bounded crawler, and preserve dated historical aliases. Reports cite link observations separately from ownership decisions. Optional local llama.cpp-compatible drafting selects bounded queries and validated source quotations. No model downloads or cloud fallback. [Setup and limits](docs/DISCOVERY_WORKBENCH.md).
 
 ## Reviewable investigations and local cleanup
 

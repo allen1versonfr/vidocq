@@ -1,3 +1,13 @@
+# Validation for Vidocq 2.14.0
+
+The 215-test Python suite passes locally (one Windows symlink-capability skip). All seven frontend scripts and the browser helper pass JavaScript syntax checks. The extension action is exercised with selected-text/link/download fixtures; no real browser installation or visual validation is claimed. New tests cover distinct browser/Photon provenance, robots/host/depth limits, public DNS pinning/private destination refusal, historical aliases/query planning, attached link evidence without automatic pivots, and model output/citation/consent validation.
+
+Live public canaries returned 10 Mwmbl records for Ada Lovelace; Wikipedia and registry checks passed. The bundled Maigret public GitHub/octocat check returned a candidate; Instagram was held unavailable and Twitch reported unsupported. This does not validate all platforms or establish identity. No private-person test was run or published for this update.
+
+Windows frozen smoke validation covers imports, historical aliases, link report exports and the actual local model HTTP adapter against a synthetic loopback fixture, in addition to existing startup/update/restart/rollback and disposable burn checks. A real model was not downloaded or benchmarked. Browser installation, model quality and broader platform fixture evaluation remain explicit limits.
+
+Previous validation:
+
 # Validation for Vidocq 2.13.0
 
 The 205-test suite passes locally (one symlink-capability test skipped). All six frontend scripts pass syntax checks. The suite covers profile/shared-host parsing, alternative locations, rejected-account persistence/exclusions, analyst-confirmation history, immutable browser captures, diagnostic outcomes, relevance counts and guarded deletion. Burn tests use isolated folders and assert preservation of unrelated files and refusal of out-of-scope manifests. A Windows symlink test can skip when link creation is unavailable. Local Windows smoke checks passed browser/review APIs and exports, non-destructive burn preview, update/restart/rollback and disposable copied-executable removal. The burn fixture removed its named data/log files, executable and adjacent backup while preserving an unrelated sentinel and the actual build. No live user workspace/executable is deleted. Visual browser validation remains unavailable after the prior access denial. No local LLM inference or real-person discovery accuracy evaluation is claimed for this release.

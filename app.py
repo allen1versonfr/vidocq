@@ -22,6 +22,7 @@ from research_connectors import CLIENT as CONNECTORS, normalize_steam, is_steam_
 from additional_collectors import CLIENT as COLLECTORS
 from updater import UpdateManager
 from burn import BurnManager
+from local_drafts import CLIENT as LOCAL_DRAFTS
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -303,6 +304,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path=='/':return self.send(200,(ROOT/'ui/index.html').read_bytes(),'text/html; charset=utf-8',cookie=True)
         if not self.authorized():return self.send(403,{'error':'Open the local app window first.'})
         route=urlparse(self.path).path
+        if route=='/workbench.js':return self.send(200,(ROOT/'ui/workbench.js').read_bytes(),'application/javascript; charset=utf-8')
+        if route=='/api/local-drafts':return self.send(200,LOCAL_DRAFTS.status())
         if route=='/review.js':return self.send(200,(ROOT/'ui/review.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/collectors.js':return self.send(200,(ROOT/'ui/collectors.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/api/collectors':return self.send(200,COLLECTORS.status())
@@ -356,6 +359,21 @@ class Handler(BaseHTTPRequestHandler):
             p=json.loads(self.rfile.read(size))
             if not isinstance(p,dict):raise ValueError('Invalid request.')
             if BURN.pending:return self.send(409,{'error':'Vidocq burn is pending; new writes are disabled.'})
+            if self.path=='/api/local-drafts':return self.send(200,LOCAL_DRAFTS.configure(p))
+            workbench=re.fullmatch(r'/api/cases/([0-9a-f]{24})/(link-import|public-links|query-plan|local-draft|aliases)',self.path)
+            if workbench:
+                from discovery_tools import crawl,import_links,query_plan,aliases
+                key,action=workbench[1],workbench[2];case=CASES.get(key)
+                if action=='query-plan':return self.send(200,{'queries':query_plan(case)})
+                if action=='aliases':return self.send(200,CASES.update(key,{**case,'aliases':aliases(p.get('aliases',[]))}))
+                if action=='local-draft':
+                    run=CASES.run(p['run_id']) if p.get('run_id') else None
+                    if run and run['case_id']!=key:raise ValueError('Select a report from this case.')
+                    return self.send(200,LOCAL_DRAFTS.generate(case,run,p.get('mode'),p.get('consent')))
+                if p.get('consent') is not True:raise ValueError('Review and approve this evidence import or direct request.')
+                data=crawl(p) if action=='public-links' else import_links(p)
+                finding=CASES.link_capture(key,data,INVESTIGATION.save_finding)
+                return self.send(201,{'evidence':finding,'result':data})
             if self.path=='/api/burn/preview':
                 if CASES.active or UPDATES.status()['phase'] in ('checking','downloading','applying'):raise ValueError('Wait for investigations and updates to finish before deletion.')
                 return self.send(200,BURN.preview(p.get('remove_executable',False)))
@@ -367,6 +385,12 @@ class Handler(BaseHTTPRequestHandler):
                     os._exit(0)
                 threading.Timer(1,finish_burn).start();return
             if self.path=='/api/collectors/maigret/setup':return self.send(200,COLLECTORS.setup_maigret())
+            if self.path=='/api/collectors/health':
+                from collector_policy import CHECKER_HOLDS
+                if p.get('consent') is not True:raise ValueError('Approve the public GitHub octocat canary check.')
+                result=COLLECTORS.maigret('octocat','health-check',['GitHub'])
+                checks=[c for r in result.get('results',[]) for c in r.get('checks',[])]
+                return self.send(200,{'canary':'GitHub/octocat','expected':'candidate','passed':any(c.get('site')=='GitHub' and c.get('outcome')=='candidate' for c in checks),'result':result,'unavailable':CHECKER_HOLDS,'notice':'A positive canary validates this checker now, not other sites or ownership. Errors and empty canaries are failures.'})
             if self.path=='/api/collectors':return self.send(200,COLLECTORS.configure(p))
             if self.path=='/api/collectors/lookup':
                 if p.get('consent') is not True:raise ValueError('Confirm the selected collector activity.')

@@ -72,7 +72,7 @@ class WebSearch:
                 raise ValueError('Free search unavailable (HTTP '+str(error.code)+'). This is not a no-match result.') from None
             except (URLError,TimeoutError,OSError):raise ValueError('Free search could not be reached. This is not a no-match result.') from None
     def search_terms(self,terms):
-        if not isinstance(terms,list) or not 1<=len(terms)<=4 or any(not isinstance(t,str) or not t.strip() or len(t)>120 or any(ord(c)<32 for c in t) for t in terms):raise ValueError('Invalid context search terms.')
+        if not isinstance(terms,list) or not 1<=len(terms)<=4 or any(not isinstance(t,str) or not t.strip() or len(t)>2000 or any(ord(c)<32 for c in t) for t in terms) or sum(len(t) for t in terms)>2200:raise ValueError('Invalid context search terms.')
         return self.search('',terms=terms)
     def search(self,value,site=None,terms=None):
         if site is not None and site not in ('instagram.com','tiktok.com','vsco.co','steamcommunity.com'):raise ValueError('Unsupported social index scope.')

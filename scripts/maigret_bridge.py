@@ -20,7 +20,7 @@ from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from urllib.parse import urlparse
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from collector_policy import MAIGRET_SITES,selected
+from collector_policy import MAIGRET_SITES,selected,CHECKER_HOLDS
 
 def site_selection(names):
     from maigret.sites import MaigretDatabase
@@ -30,6 +30,7 @@ def site_selection(names):
     all_sites=db.ranked_sites_dict(top=100000,disabled=False,id_type='username')
     chosen={};aliases={}
     for canonical in names:
+        if canonical in CHECKER_HOLDS:continue
         match=next(((name,site) for name,site in all_sites.items() if name.casefold()==canonical.casefold()),None)
         if not match:continue
         name,site=match;site=copy.deepcopy(site)
@@ -94,7 +95,7 @@ class Bridge:
                 if url and (urlparse(url).scheme not in ('http','https') or urlparse(url).hostname not in MAIGRET_SITES[requested]):state='Unknown';url=''
                 error_type=str(getattr(getattr(status,'error',None),'type',''))
                 outcome='candidate' if state=='Claimed' else 'absent' if state=='Available' else 'invalid-handle' if state=='Illegal' else 'unsupported' if actual is None else 'timeout' if 'timeout' in error_type.lower() else 'blocked' if any(t in error_type.lower() for t in ('captcha','bot','access denied','blocked','login','rate')) else 'cancelled' if cancelled else 'timeout' if timed_out else 'error'
-                reason={'candidate':'Account may exist; ownership unverified.','absent':'No account detected by this check; not proof of absence.','unsupported':'Selected site unavailable in the installed reviewed database.','cancelled':'Run cancelled before a reliable result.','timeout':'Check or run deadline exceeded.','blocked':'Provider access/challenge/rate restriction; no bypass attempted.','error':'Check did not produce a reliable result.','invalid-handle':'Handle is not accepted by this site.'}[outcome]
+                reason=CHECKER_HOLDS.get(requested) or {'candidate':'Account may exist; ownership unverified.','absent':'No account detected by this check; not proof of absence.','unsupported':'Selected site unavailable in the installed reviewed database.','cancelled':'Run cancelled before a reliable result.','timeout':'Check or run deadline exceeded.','blocked':'Provider access/challenge/rate restriction; no bypass attempted.','error':'Check did not produce a reliable result.','invalid-handle':'Handle is not accepted by this site.'}[outcome]
                 rows.append({'site':requested,'status':state,'url':url,'username':username,'outcome':outcome,'reason':reason})
             return {'username':username,'results':rows,'cancelled':cancelled,'protocol':1}
         finally:
