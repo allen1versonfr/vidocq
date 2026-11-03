@@ -35,6 +35,9 @@ DATA = Path(os.environ.get('VIDOCQ_DATA') or os.environ.get('ALL_SEEING_EYES_DAT
 EXIT_EVENT = threading.Event()
 UPDATES = UpdateManager(DATA)
 BURN = BurnManager(DATA)
+from managed_local_ai import ManagedLocalAI
+LOCAL_AI = ManagedLocalAI(DATA)
+LOCAL_DRAFTS.manager=LOCAL_AI
 NETWORK_HOSTS = frozenset({'archive.org', 'crt.sh', 'en.wikipedia.org', 'rdap.arin.net', 'rdap.db.ripe.net', 'rdap.apnic.net', 'rdap.lacnic.net', 'rdap.afrinic.net', 'openlibrary.org', 'api.gdeltproject.org'})
 LINK_HOSTS = NETWORK_HOSTS | {'www.google.com', 'www.bing.com', 'lookup.icann.org', 'stat.ripe.net', 'duckduckgo.com', 'scholar.google.com', 'pubmed.ncbi.nlm.nih.gov', 'patents.google.com'}
 COOKIE = secrets.token_urlsafe(32)
@@ -306,6 +309,9 @@ class Handler(BaseHTTPRequestHandler):
         route=urlparse(self.path).path
         if route=='/workbench.js':return self.send(200,(ROOT/'ui/workbench.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/api/local-drafts':return self.send(200,LOCAL_DRAFTS.status())
+        if route=='/api/local-ai':return self.send(200,LOCAL_AI.status())
+        if route=='/api/local-ai/licenses':return self.send(200,{'text':(ROOT/'docs/LOCAL_AI_LICENSES.txt').read_text(encoding='utf-8')})
+        if route=='/local-ai.js':return self.send(200,(ROOT/'ui/local-ai.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/review.js':return self.send(200,(ROOT/'ui/review.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/collectors.js':return self.send(200,(ROOT/'ui/collectors.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/api/collectors':return self.send(200,COLLECTORS.status())
@@ -360,6 +366,9 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(p,dict):raise ValueError('Invalid request.')
             if BURN.pending:return self.send(409,{'error':'Vidocq burn is pending; new writes are disabled.'})
             if self.path=='/api/local-drafts':return self.send(200,LOCAL_DRAFTS.configure(p))
+            if self.path=='/api/local-ai/setup':return self.send(202,LOCAL_AI.setup(p.get('consent'),p.get('backend','vulkan')))
+            if self.path=='/api/local-ai/cancel':return self.send(200,LOCAL_AI.cancel())
+            if self.path=='/api/local-ai/settings':return self.send(200,LOCAL_AI.set_enabled(p.get('enabled'),p.get('backend')))
             workbench=re.fullmatch(r'/api/cases/([0-9a-f]{24})/(link-import|public-links|query-plan|local-draft|aliases)',self.path)
             if workbench:
                 from discovery_tools import crawl,import_links,query_plan,aliases
@@ -375,11 +384,13 @@ class Handler(BaseHTTPRequestHandler):
                 finding=CASES.link_capture(key,data,INVESTIGATION.save_finding)
                 return self.send(201,{'evidence':finding,'result':data})
             if self.path=='/api/burn/preview':
+                if LOCAL_AI.busy:raise ValueError('Wait for local AI setup to finish, or cancel it before deletion.')
                 if CASES.active or UPDATES.status()['phase'] in ('checking','downloading','applying'):raise ValueError('Wait for investigations and updates to finish before deletion.')
                 return self.send(200,BURN.preview(p.get('remove_executable',False)))
             if self.path=='/api/burn/execute':
+                if LOCAL_AI.busy:raise ValueError('Wait for local AI setup to finish, or cancel it before deletion.')
                 if CASES.active or UPDATES.status()['phase'] in ('checking','downloading','applying'):raise ValueError('Wait for investigations and updates to finish before deletion.')
-                result=BURN.execute(p);self.send(202,result)
+                LOCAL_AI.stop();result=BURN.execute(p);self.send(202,result)
                 def finish_burn():
                     if COLLECTORS.manager:COLLECTORS.manager.stop()
                     os._exit(0)
@@ -452,6 +463,8 @@ class Handler(BaseHTTPRequestHandler):
                 UPDATES.download()
                 return self.send(202,UPDATES.status())
             if self.path=='/api/updates/install':
+                if LOCAL_AI.busy:raise ValueError('Wait for local AI setup to finish, or cancel it before installing an update.')
+                LOCAL_AI.stop()
                 UPDATES.install()
                 self.send(202,UPDATES.status())
                 threading.Timer(1.5,lambda: os._exit(0)).start()
@@ -532,6 +545,7 @@ def main():
         try:server.serve_forever()
         except KeyboardInterrupt:pass
         finally:
+            LOCAL_AI.stop()
             if COLLECTORS.manager:COLLECTORS.manager.stop()
             server.server_close()
         return
@@ -563,6 +577,7 @@ def main():
                 EXIT_EVENT.wait()
     except KeyboardInterrupt:pass
     finally:
+        LOCAL_AI.stop()
         if COLLECTORS.manager:COLLECTORS.manager.stop()
         server.shutdown();server.server_close()
 

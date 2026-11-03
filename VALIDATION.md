@@ -1,3 +1,13 @@
+# Validation for Vidocq 2.15.0
+
+The 229-test Python suite covers pinned download verification/resume/restart/cancellation, safe member extraction, persisted settings, on-demand/authenticated fixed-loopback startup, CPU fallback, real Windows job-object lifecycle protection, and exact managed-file Burn deletion with unknown-file preservation. One local symlink-capability test can skip. All eight frontend scripts and the browser helper pass syntax checks.
+
+Separate local validation downloaded the actual pinned Qwen3-4B-Instruct-2507 Q4_K_M model (2,497,280,448 bytes), verified SHA-256, installed the reviewed llama.cpp b12079 Vulkan runtime and passed a synthetic setup response. Actual model query selection and cited extraction passed on synthetic input, without any private-person investigation. One observed source run took about 6 seconds for startup plus query selection and under 1 second for a subsequent cited excerpt; these are local observations, not hardware-independent guarantees.
+
+Frozen smoke tests cover consent/default-off installer APIs, packaged licenses/UI, managed model/settings preservation through replacement/restart/rollback, and existing features. Real frozen-model testing uses an already installed disposable .test-data workspace; CI uses synthetic fixtures to avoid a 2.5 GB download per build. Browser visual tests are not claimed.
+
+Previous validation:
+
 # Validation for Vidocq 2.14.0
 
 The 215-test Python suite passes locally (one Windows symlink-capability skip). All seven frontend scripts and the browser helper pass JavaScript syntax checks. The extension action is exercised with selected-text/link/download fixtures; no real browser installation or visual validation is claimed. New tests cover distinct browser/Photon provenance, robots/host/depth limits, public DNS pinning/private destination refusal, historical aliases/query planning, attached link evidence without automatic pivots, and model output/citation/consent validation.

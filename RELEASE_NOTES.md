@@ -1,3 +1,14 @@
+# Vidocq 2.15.0 - One-click local AI setup
+
+- First-run/Updates entry points for optional managed Qwen3-4B-Instruct-2507 Q4_K_M and llama.cpp setup (about 2.54 GB, roughly 3 GB free disk space). No terminal/server configuration needed.
+- Pinned hashes/revisions, progress, cancel/resume, repair and a synthetic startup check; Vulkan GPU mode with CPU fallback.
+- Installed model/settings persist through app update, restart and rollback. The server loads on an approved draft and stops with the app. No silent replacement downloads or cloud fallback.
+- Authenticated loopback-only inference, offline runtime, per-draft approval, Windows process lifecycle protection and exact managed-file Burn previews.
+
+[Setup and licenses](docs/LOCAL_AI_SETUP.md). Existing GPU drivers/Windows runtime support are required; no driver installer is included. Vidocq remains portable: setup is offered inside the first launch and Updates screen.
+
+## Previous release
+
 # Vidocq 2.14.0 - Discovery workbench
 
 - Chrome/Firefox active-tab helper exports reviewed selections and links to local JSON; import without repeated copy/paste.

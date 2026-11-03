@@ -20,6 +20,26 @@ class BurnTests(unittest.TestCase):
         p=self.manager.preview();names={Path(x['path']).name for x in p['files']}
         self.assertEqual(names,set(OWNED_FILES));self.assertEqual({Path(x['path']).name for x in p['files'] if x['exists']},{'workspace.sqlite3','.vidocq-owner.json'});self.assertTrue((self.root/'workspace.sqlite3').exists());self.assertFalse(p['remove_executable'])
         self.assertIn('backups',' '.join(p['limitations']))
+    @unittest.skipUnless(os.name=='nt','Windows helper')
+    def test_managed_ai_files_are_previewed_and_deleted_but_unknown_files_survive(self):
+        from local_ai_assets import MODEL
+        ai_root=self.root/'local-ai';runtime=ai_root/'runtime';runtime.mkdir(parents=True)
+        model=ai_root/MODEL['filename'];model.write_bytes(b'synthetic model')
+        (runtime/'llama-server.exe').write_bytes(b'synthetic executable')
+        (ai_root/'private-notes.txt').write_text('Preserve unrelated data')
+        (self.root/'local-ai.json').write_text('{"enabled":false}')
+        plan=self.manager.preview();self.assertIn(str(model),[f['path'] for f in plan['files']])
+        folder=self.helper(preserve_plan=True)
+        try:
+            self.assertFalse(model.exists());self.assertFalse((runtime/'llama-server.exe').exists());self.assertFalse((self.root/'local-ai.json').exists());self.assertTrue((ai_root/'private-notes.txt').exists());self.assertFalse(folder.exists())
+        finally:
+            if folder.exists():shutil.rmtree(folder)
+    @unittest.skipUnless(os.name=='nt','Windows helper')
+    def test_ai_prefix_does_not_allow_deleting_unowned_files(self):
+        unknown=self.root/'local-ai'/'unowned.txt';unknown.parent.mkdir();unknown.write_text('Preserve')
+        folder=self.helper(lambda p:p['files'].append({'path':str(unknown),'exists':True,'size':8}))
+        try:self.assertTrue(unknown.exists());self.assertTrue((folder/'failure.txt').exists());self.assertTrue((self.root/'workspace.sqlite3').exists())
+        finally:shutil.rmtree(folder)
     def test_refuses_roots_and_source_executable_removal(self):
         for path in [Path.home(),Path.cwd(),Path(Path.cwd().anchor)]:
             with self.assertRaises(ValueError):safe_root(path)

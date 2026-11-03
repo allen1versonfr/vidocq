@@ -1,3 +1,7 @@
+# 2.15.0
+
+Added optional managed local AI setup in first-run/Updates flows, pinned resumable downloads, automatic authenticated runtime startup, Vulkan/CPU fallback, persisted settings/assets, real-model checks and guarded managed-file deletion. See docs/LOCAL_AI_SETUP.md.
+
 # 2.14.0
 
 Added reviewed Chrome/Firefox capture helper, Photon JSON import, separately approved bounded public-link capture, query variants and historical aliases, cited link evidence, an Instagram checker hold/public GitHub canary, and optional local query/excerpt drafting. See docs/DISCOVERY_WORKBENCH.md for setup and limits.

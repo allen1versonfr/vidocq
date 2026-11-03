@@ -23,7 +23,7 @@ tag='v'+VERSION
 exe=Path('dist/Vidocq.exe')
 data=exe.read_bytes();digest=hashlib.sha256(data).hexdigest()
 Path('dist/SHA256SUMS.txt').write_text(digest+'  Vidocq.exe\n'+bridge_digest+'  Maigret-Bridge.zip\n'+extension_digest+'  Reviewed-Evidence-Extension.zip\n',encoding='utf-8')
-Path('dist/BUILD_INFO.json').write_text(json.dumps({'name':'Vidocq','version':VERSION,'platform':'Windows 10/11 x64','windows_runtime_tested':True,'automated_tests':unittest.defaultTestLoader.discover('tests').countTestCases(),'frozen_smoke_test':True,'live_public_index_canaries':True,'embedded_icon_verified':True,'social_profile_api_test':True,'phone_case_report_api_test':True,'replacement_restart_test':True,'failed_start_rollback_test':True,'size_bytes':len(data),'sha256':digest},indent=2),encoding='utf-8')
+Path('dist/BUILD_INFO.json').write_text(json.dumps({'name':'Vidocq','version':VERSION,'platform':'Windows 10/11 x64','windows_runtime_tested':True,'automated_tests':unittest.defaultTestLoader.discover('tests').countTestCases(),'frozen_smoke_test':True,'managed_ai_setup_api_test':True,'ai_files_preserved_by_update_test':True,'model_weights_bundled':False,'live_public_index_canaries':True,'embedded_icon_verified':True,'social_profile_api_test':True,'phone_case_report_api_test':True,'replacement_restart_test':True,'failed_start_rollback_test':True,'size_bytes':len(data),'sha256':digest},indent=2),encoding='utf-8')
 shutil.copyfile('build/assets/vidocq.ico','dist/Vidocq.ico')
 notes=Path('RELEASE_NOTES.md')
 existing=subprocess.run(['gh','release','view',tag,'--json','isDraft'],capture_output=True,text=True)

@@ -10,7 +10,11 @@ import tempfile
 import time
 import threading
 
-OWNED_FILES=('workspace.sqlite3','workspace.sqlite3-wal','workspace.sqlite3-shm','workspace.sqlite3-journal','startup.log','update-result.json','.vidocq-owner.json')
+OWNED_FILES=('workspace.sqlite3','workspace.sqlite3-wal','workspace.sqlite3-shm','workspace.sqlite3-journal','startup.log','update-result.json','.vidocq-owner.json','local-ai.json','local-ai.json.part')
+
+def owned_files(root):
+    from managed_local_ai import owned_ai_files
+    return list(OWNED_FILES)+(owned_ai_files() if no_links(root/'local-ai').is_dir() else [])
 
 def no_links(path):
     path=Path(path).absolute()
@@ -44,7 +48,7 @@ class BurnManager:
         if type(remove_executable) is not bool:raise ValueError('Choose whether to remove the executable.')
         root,owner=mark_workspace(self.data)
         files=[]
-        for name in OWNED_FILES:
+        for name in owned_files(root):
             target=no_links(root/name)
             if target.exists() and not target.is_file():raise ValueError('An owned filename is not a regular file; burn refused.')
             files.append({'path':str(target),'exists':target.exists(),'size':target.stat().st_size if target.exists() else 0})
@@ -65,7 +69,7 @@ class BurnManager:
         if not plan or payload.get('confirmation')!='BURN VIDOCQ' or not secrets.compare_digest(str(payload.get('token','')),plan['token']) or time.monotonic()-plan['created']>300:raise ValueError('Preview deletion, then type BURN VIDOCQ within five minutes.')
         root,owner=mark_workspace(self.data)
         if str(root)!=plan['root'] or owner!=plan['owner']:raise ValueError('Workspace identity changed; create a fresh preview.')
-        current=[str(no_links(root/name)) for name in OWNED_FILES if (root/name).is_file()]
+        current=[str(no_links(root/name)) for name in owned_files(root) if (root/name).is_file()]
         if set(current)!={f['path'] for f in plan['files'] if f['exists']}:raise ValueError('Workspace files changed; create a fresh preview.')
         if os.name!='nt':raise ValueError('This burn helper is supported in the Windows app only.')
         folder=Path(tempfile.mkdtemp(prefix='Vidocq-burn-'));script=folder/'cleanup.ps1';job=folder/'job.json'
