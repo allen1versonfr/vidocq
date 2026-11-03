@@ -15,6 +15,7 @@ import time
 import webbrowser
 from datetime import datetime, timezone
 from version import VERSION
+from social_profiles import PLATFORMS,detect_platform,normalize_profile,profile_reference
 from web_search import CLIENT as WEB_SEARCH,SearchNotConfigured,outcome
 from updater import UpdateManager
 from http.cookies import SimpleCookie
@@ -62,6 +63,8 @@ def normalize(kind, value):
     value=value.strip()
     if any(ord(c)<32 for c in value):
         raise ValueError('Control characters are not allowed.')
+    if kind in PLATFORMS:return kind,normalize_profile(kind,value)
+    if kind=='auto' and detect_platform(value):return normalize(detect_platform(value),value)
     if kind=='phone':
         from phone_lookup import inspect_phone
         return 'phone',inspect_phone(value)['e164']
@@ -70,7 +73,7 @@ def normalize(kind, value):
             ipaddress.ip_address(value)
             kind='ip'
         except ValueError:
-            kind='person' if ' ' in value and any(c.isalpha() for c in value) and not value.startswith(('https://','http://')) else 'phone' if re.fullmatch(r'[+()0-9 .-]+',value) and sum(c.isdigit() for c in value)>=7 else 'email' if '@' in value and ' ' not in value else ('domain' if '.' in value and ' ' not in value else 'username')
+            kind='username' if value.startswith('@') and ' ' not in value else 'person' if ' ' in value and any(c.isalpha() for c in value) and not value.startswith(('https://','http://')) else 'phone' if re.fullmatch(r'[+()0-9 .-]+',value) and sum(c.isdigit() for c in value)>=7 else 'email' if '@' in value and ' ' not in value else ('domain' if '.' in value and ' ' not in value else 'username')
     if kind=='phone':
         from phone_lookup import inspect_phone
         return 'phone',inspect_phone(value)['e164']
@@ -104,6 +107,9 @@ def link(title, url, note):
 
 
 def prepared_links(kind,value):
+    if kind in PLATFORMS:
+        host=PLATFORMS[kind]['host'];query='site:'+host+' "'+value+'"'
+        return [link(PLATFORMS[kind]['name']+' indexed mentions · '+title,base+'?'+urlencode({'q':query}),'Search-engine index only. The profile is not visited; relevance and ownership are unverified.') for title,base in [('Google','https://www.google.com/search'),('Bing','https://www.bing.com/search'),('DuckDuckGo','https://duckduckgo.com/')]]
     exact='"'+value.replace('"','')+'"'
     links=[link('Google indexed mentions','https://www.google.com/search?'+urlencode({'q':exact}),'Search results only. Opening an original result can contact that website.'),link('Bing indexed mentions','https://www.bing.com/search?'+urlencode({'q':exact}),'Search this independent index; the provider receives the query.')]
     if kind=='username':
@@ -222,12 +228,13 @@ def run_adapter(name,fn,value):
 def research(kind,value):
     kind,value=normalize(kind,value)
     adapters=list(ADAPTERS.get(kind,[]))
+    if kind in PLATFORMS:adapters.append((PLATFORMS[kind]['name']+' web index (Brave)',lambda handle:WEB_SEARCH.search(handle,site=PLATFORMS[kind]['host'])))
     if kind in ('person','username','email','phone'):adapters.append(('Brave web index',WEB_SEARCH.search))
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
         results=list(pool.map(lambda pair:run_adapter(pair[0],pair[1],value),adapters))
     flat=[dict(row,origin='offline-metadata' if r['provider']=='Offline phone metadata' else 'retrieved') for r in results for row in r['rows']]
     status,message=outcome(results,flat)
-    return {'search_outcome':status,'search_message':message,'web_search':WEB_SEARCH.status(),'kind':kind,'query':value,'searched_at':datetime.now(timezone.utc).isoformat(),'results':results,'links':prepared_links(kind,value),'mode':'Third-party indexes only','notice':'No target-owned website, profile, DNS server, or IP is queried directly. Providers may log requests. There is no guarantee of anonymity or absence of notification.'}
+    return {'search_outcome':status,'search_message':message,'web_search':WEB_SEARCH.status(),'kind':kind,'query':value,'social_profile':({'platform':kind,'handle':value,'reference':profile_reference(kind,value),'status':'User supplied; not visited or verified'} if kind in PLATFORMS else None),'searched_at':datetime.now(timezone.utc).isoformat(),'results':results,'links':prepared_links(kind,value),'mode':'Third-party indexes only','notice':'No target-owned website, profile, DNS server, or IP is queried directly. Providers may log requests. There is no guarantee of anonymity or absence of notification.'}
 
 
 class NotebookConnection(sqlite3.Connection):
@@ -282,6 +289,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path=='/':return self.send(200,(ROOT/'ui/index.html').read_bytes(),'text/html; charset=utf-8',cookie=True)
         if not self.authorized():return self.send(403,{'error':'Open the local app window first.'})
         route=urlparse(self.path).path
+        if route=='/vidocq-icon.svg':return self.send(200,(ROOT/'ui/vidocq-icon.svg').read_bytes(),'image/svg+xml')
         if route=='/api/search-connection':return self.send(200,WEB_SEARCH.status())
         if route=='/api/cases':return self.send(200,CASES.list())
         match=re.fullmatch(r'/api/cases/([0-9a-f]{24})',route)
@@ -413,6 +421,9 @@ def main():
         assert phone_lookup.inspect_phone('+442083661177')['e164']=='+442083661177'
         from catalog import catalog
         assert catalog()['summary']['entries'] == len(catalog()['entries'])
+        assert normalize('auto','https://www.tiktok.com/@example')==('tiktok','example')
+        if getattr(sys,'frozen',False):
+            icon=Image.open(ROOT/'assets/vidocq.ico');assert icon.format=='ICO' and (256,256) in icon.ico.sizes()
         assert (ROOT/'ui/index.html').is_file() and (ROOT/'ui/app.js').is_file()
         if args.smoke_test:args.smoke_test.write_text(json.dumps({'version':VERSION,'ok':True}),encoding='utf-8')
         if args.update_ready:args.update_ready.write_text(VERSION,encoding='utf-8')
