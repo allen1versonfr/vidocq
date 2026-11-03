@@ -1,0 +1,39 @@
+name: Build and release Vidocq
+on:
+  push:
+    branches: [main]
+    paths: ['version.py', '.github/workflows/windows.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: vidocq-release
+  cancel-in-progress: false
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned build dependencies
+        run: python -m pip install -r requirements.txt pyinstaller==6.20.0
+      - name: Test application and update recovery
+        run: python -m unittest discover -s tests -v
+      - name: Validate frontend syntax
+        run: node --check ui/app.js
+      - name: Build portable Windows executable
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name Vidocq --add-data "ui;ui" --collect-all webview launch.py
+      - name: Test actual Windows executable, replacement, restart and rollback
+        run: python scripts/windows_smoke.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Vidocq-Windows-verified
+          path: dist/Vidocq.exe
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: python scripts/publish_release.py
