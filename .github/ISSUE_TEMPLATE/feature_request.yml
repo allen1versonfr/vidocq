@@ -1,0 +1,27 @@
+name: Feature request
+description: Suggest a focused improvement to Vidocq.
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to accomplish?
+      description: Describe the task and the current limitation, without personal data.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What should the app do, and where should it appear?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Current workaround or alternatives
+  - type: textarea
+    id: integration
+    attributes:
+      label: Provider or integration details
+      description: If applicable, identify the provider, credentials needed, and data that would leave the computer. Do not include actual keys.
