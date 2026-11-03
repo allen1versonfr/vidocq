@@ -2,6 +2,15 @@
 
 Changes documented from the releases created for this repository.
 
+## 2.4.0 — 2026-11-03
+
+- Added the full 1,171-entry framework source catalog with free-tier, category, text and integration filters.
+- Made all 1,040 upstream free-access entries discoverable, with index-only searches for unintegrated tools.
+- Added Open Library results and additional reviewed search-index links.
+- Added per-entry coverage decisions, source provenance and MIT attribution.
+- Bundled the directory for offline browsing; no original-source visits or tool execution are performed by catalog actions.
+- Expanded validation to 53 tests; Windows frozen executable and updater checks gate publication.
+
 ## 2.3.0 — 2026-11-03
 
 ### Added
