@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="340" viewBox="0 0 1280 340" role="img" aria-labelledby="title desc">
+<title id="title">Vidocq — Follow the evidence.</title><desc id="desc">A dark navy banner with a gold geometric V emblem and Vidocq wordmark.</desc>
+<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0c1521"/><stop offset="1" stop-color="#172638"/></linearGradient><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#748499" stroke-opacity=".08"/></pattern></defs>
+<rect width="1280" height="340" rx="18" fill="url(#bg)"/><rect width="1280" height="340" rx="18" fill="url(#grid)"/>
+<circle cx="1100" cy="170" r="220" fill="none" stroke="#d4b170" stroke-opacity=".09"/><circle cx="1100" cy="170" r="160" fill="none" stroke="#d4b170" stroke-opacity=".13"/><circle cx="1100" cy="170" r="100" fill="none" stroke="#d4b170" stroke-opacity=".19"/>
+<path d="M84 112L140 226L196 112M112 112L140 170L168 112" fill="none" stroke="#d4b170" stroke-width="9" stroke-linecap="square"/><circle cx="140" cy="245" r="4" fill="#d4b170"/>
+<text x="244" y="127" font-family="Segoe UI,Arial,sans-serif" font-size="13" letter-spacing="5" fill="#d4b170">PUBLIC INDEXES · LOCAL WORKSPACE</text>
+<text x="240" y="209" font-family="Segoe UI,Arial,sans-serif" font-weight="600" font-size="78" letter-spacing="8" fill="#f0f2f5">VIDOCQ</text>
+<text x="244" y="257" font-family="Segoe UI,Arial,sans-serif" font-size="23" fill="#aebdcd">Follow the evidence.</text>
+<path d="M80 294H1200" stroke="#d4b170" stroke-opacity=".25"/>
+</svg>
