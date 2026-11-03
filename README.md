@@ -1,30 +1,108 @@
-# Vidocq
+<p align="center">
+  <img src="docs/assets/vidocq-banner.svg" alt="Vidocq — Follow the evidence. Public indexes, local workspace." width="100%">
+</p>
 
-Portable Windows research app with a local notebook, reviewed public-index adapters, reverse-image search through SauceNAO, and GitHub self-updates.
+<p align="center">
+  <strong>A portable research workspace for Windows.</strong><br>
+  Search public indexes, trace image sources, and keep your findings together.
+</p>
 
-Download **Vidocq.exe** from [the latest release](https://github.com/allen1versonfr/test/releases/latest). Windows 10/11 x64. Native UI uses Microsoft Edge WebView2; the app can fall back to your default browser.
+<p align="center">
+  <a href="https://github.com/allen1versonfr/test/releases/latest"><strong>Download Vidocq.exe</strong></a> ·
+  <a href="docs/USER_GUIDE.md">User guide</a> ·
+  <a href="docs/UPDATES.md">Updates &amp; recovery</a> ·
+  <a href="https://github.com/allen1versonfr/test/issues">Report an issue</a>
+</p>
 
-## Updating
+<p align="center">
+  <a href="https://github.com/allen1versonfr/test/actions/workflows/windows.yml"><img src="https://github.com/allen1versonfr/test/actions/workflows/windows.yml/badge.svg" alt="Windows build and release status"></a>
+  <img src="https://img.shields.io/badge/platform-Windows_10%2F11_x64-172638?style=flat-square" alt="Windows 10/11 x64">
+  <img src="https://img.shields.io/badge/interface-pywebview-d4b170?style=flat-square" alt="Python and pywebview interface">
+</p>
 
-Replace the original 2.2.1 executable with 2.3.0 once. Then open **Updates**:
+## Meet Vidocq
 
-1. Vidocq checks for newer stable releases when it starts.
-2. For this private repository, enter a fine-grained GitHub token with **Contents: read** permission on `allen1versonfr/test`, then Check for updates. Tokens stay in memory and are never written to the notebook, logs, or update jobs. Optionally set `VIDOCQ_GITHUB_TOKEN` on your own machine for checks across launches. Public repositories need no token.
-3. Choose Download update. Vidocq checks the file size and GitHub SHA-256 digest, then offers Install and restart.
-4. Vidocq closes, replaces its executable, and restarts. If startup fails, it restores the previous executable. A `.previous` copy is retained beside the executable.
+Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-Use a writable folder. Notebook data remains in `%LOCALAPPDATA%\Vidocq\workspace.sqlite3`; legacy AllSeeingEyes and OSINTDesk notebooks are copied once when needed. Updating does not delete notebooks. SHA-256 validates downloaded bytes against GitHub metadata; it is not an independent code signature. Only publish trusted builds from this repository.
+The current Windows release is **2.3.0**. Its 45 automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
 
-## Development and releases
+## What you can do
 
-Python 3.12. Install requirements, then run `python -m unittest discover -s tests -v`. Run `python app.py --browser` for development. `build_windows.bat` builds a single executable and runs Windows frozen-app and updater integration checks.
+| Workspace | What it offers |
+| --- | --- |
+| **Research** | Look up domains, public IPs, and topics through reviewed third-party indexes. Prepare username and email search queries. |
+| **Image search** | Search SauceNAO for possible image-source matches, with similarity scores and source references. |
+| **Notebook** | Save returned records or your own observations, add context and an evidence status, and export findings as JSON. |
+| **Source policy** | Review the providers used, the research boundaries, and what is stored locally. |
+| **Updates** | Check stable GitHub releases, download with progress, verify the file, and install with a restart. |
 
-The Windows release workflow builds from source, runs tests, exercises the actual executable, verifies replacement/restart and failed-start rollback, uploads artifacts, then creates a versioned release with Vidocq.exe, SHA256SUMS.txt and BUILD_INFO.json. Publishing happens only after all checks pass. Future releases: update source/tests and release notes, bump `version.py` using a stable semantic version, and push to main (or run the workflow manually). Published versions cannot be overwritten by the pipeline. Draft releases may be retried.
+### Search coverage
 
-The original bootstrap release is retained. Its encoded files under `.release-payload` are historical; new releases build directly from the source here.
+| Input | Integrated results | Optional browser searches |
+| --- | --- | --- |
+| Domain | Certificate Transparency records from crt.sh; Internet Archive snapshot metadata | Google, Bing, ICANN registration lookup, indexed pages |
+| Public IP | ARIN RDAP network-allocation records; provider redirects are restricted to the reviewed registry hosts | Google, Bing, RIPEstat |
+| Topic / organization | Wikipedia search results | Google, Bing, Wikipedia |
+| Username | Prepared search links; no account-existence checks | Google, Bing, and Google queries scoped to GitHub, Reddit, Instagram, or TikTok |
+| Email | Prepared search links; no mailbox or account validation | Google and Bing |
+| Image | SauceNAO visual matches after upload consent | Returned source addresses are displayed as references |
 
-## Research boundaries
+Providers can return incomplete data, errors, or no results. A match is a lead to evaluate, not proof of identity or ownership.
 
-Queries go only to reviewed third-party indexes; the app does not contact submitted profiles, domains, or IPs directly. Prepared search links open only after a click. SauceNAO requires your API key and explicit image-upload consent. Image metadata is stripped before upload. No remote thumbnails or original source pages load inside the app. Providers may log requests; passive research is not anonymous. Findings are stored locally in unencrypted SQLite. Images and SauceNAO keys are not persisted.
+## Get started
 
-Inspired by OSINT Framework. `source-review.json` records the earlier directory review.
+1. Open the [latest release](https://github.com/allen1versonfr/test/releases/latest) and download **Vidocq.exe** under **Assets**. The source-code ZIP is for development.
+2. Put the executable in a writable folder, such as `Documents\Vidocq`, and run it. The release includes its Python runtime; you do not need to install Python.
+3. In **Research**, choose an input type or use Auto detect, enter a query, and select **Research**.
+4. Save useful records to **Notebook**, add your context, and export a copy when needed.
+
+**Requirements:** Windows 10/11 x64 and an internet connection for online searches and updates. The native window uses Microsoft Edge WebView2 Runtime; Vidocq can fall back to your default browser. Releases are currently unsigned.
+
+Text research does not require API keys. Image search requires your own SauceNAO API key and explicit upload consent. See the [user guide](docs/USER_GUIDE.md) for the full workflow.
+
+## Updates that stay inside the app
+
+Vidocq checks for newer stable releases when it starts. In **Updates**, choose **Download update**, then **Install and restart**. Downloads are checked against GitHub’s SHA-256 digest and expected size before the executable is replaced. A previous executable is retained for recovery; notebooks stay in their existing data folder.
+
+> **First upgrade:** the original 2.2.1 executable has no updater. Replace it with the latest Vidocq.exe once. Subsequent supported releases can update inside the app.
+>
+> **Private repository:** this repository currently requires authenticated access. Enter a fine-grained GitHub token with **Contents: read** permission on `allen1versonfr/test` in the Updates tab. Vidocq keeps it in memory for that session. Public repositories do not need a token.
+
+[Update setup, token handling, and recovery →](docs/UPDATES.md)
+
+## Your notebook stays on your computer
+
+By default, findings live at:
+
+```text
+%LOCALAPPDATA%\Vidocq\workspace.sqlite3
+```
+
+No cloud notebook sync or analytics are built in. The database is **not encrypted**. Providers receive the queries sent to them, and GitHub receives update requests. SauceNAO receives a metadata-stripped image only after your confirmation. [Read the data and privacy notes](docs/PRIVACY.md).
+
+## Build and contribute
+
+The app uses Python, a loopback HTTP backend, an HTML/CSS/JavaScript interface, pywebview, and SQLite. Windows releases are packaged as one executable with PyInstaller.
+
+```powershell
+git clone https://github.com/allen1versonfr/test.git
+cd test
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe app.py --browser
+```
+
+Repository access is required while the project is private. See [development and release instructions](docs/DEVELOPMENT.md) for tests, source layout, and Windows builds. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+
+## Need help?
+
+- [First steps, image search, notebook exports, and troubleshooting](docs/USER_GUIDE.md)
+- [Private-repository update setup and rollback](docs/UPDATES.md)
+- [Bug reports and feature requests](https://github.com/allen1versonfr/test/issues/new/choose)
+- [Changes in each documented version](CHANGELOG.md)
+
+When reporting a problem, include the app version, Windows version, and steps to reproduce it. Remove tokens, API keys, personal queries, and sensitive findings from screenshots and logs.
+
+## Credits
+
+Inspired by [OSINT Framework](https://osintframework.com/). Vidocq uses a smaller set of reviewed adapters; it does not execute the full framework directory. The earlier directory review is preserved in [source-review.json](source-review.json). Built with Python, pywebview, Pillow, SQLite, and PyInstaller; their respective licenses apply to those components.
