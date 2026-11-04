@@ -1,10 +1,13 @@
 """Lifecycle for independently licensed bundled collector processes."""
+from run_control import read_bounded
+from run_control import timeout as bounded_timeout
 import atexit,hashlib,json,os,secrets,socket,subprocess,sys,threading,time
 from pathlib import Path
 from urllib.request import Request,build_opener,ProxyHandler
 from urllib.error import HTTPError,URLError
 from local_drafts import NoRedirect
 from managed_local_ai import WindowsJob,safe_path,digest
+from child_environment import environment
 
 class ManagedCollectors:
     def __init__(self,data,bundle=None):
@@ -28,8 +31,8 @@ class ManagedCollectors:
         headers={'Content-Type':'application/json',('X-API-Key' if kind=='harvester' else 'X-Vidocq-Key'):entry['key']}
         req=Request('http://127.0.0.1:'+str(entry['port'])+path,data=None if payload is None else json.dumps(payload).encode(),headers=headers)
         try:
-            with build_opener(ProxyHandler({}),NoRedirect()).open(req,timeout=timeout) as response:
-                raw=response.read(2_000_001)
+            with build_opener(ProxyHandler({}),NoRedirect()).open(req,timeout=bounded_timeout(timeout)) as response:
+                raw=read_bounded(response,2_000_000)
                 if len(raw)>2_000_000:raise ValueError('Collector response exceeds 2 MB.')
                 return json.loads(raw)
         except HTTPError as e:
@@ -50,7 +53,7 @@ class ManagedCollectors:
             if kind=='osintgram' and (not credentials or not (credentials.get('hiker_key') or credentials.get('backend')=='instagrapi')):raise ValueError('Save your provider key or connect an operator session first.')
             data=safe_path(self.data/kind);data.mkdir(parents=True,exist_ok=True)
             with socket.socket() as listener:listener.bind(('127.0.0.1',0));port=listener.getsockname()[1]
-            key=secrets.token_urlsafe(32);env={k:v for k,v in os.environ.items() if not k.startswith(('THEHARVESTER_','HIKER','INSTAGRAM_','VIDOCQ_COMPANION_'))}
+            key=secrets.token_urlsafe(32);env=environment()
             env.update(VIDOCQ_COMPANION_KEY=key,THEHARVESTER_API_KEY=key,PYINSTALLER_RESET_ENVIRONMENT='1')
             process=subprocess.Popen([str(executable),'--port',str(port),'--data',str(data)],env=env,cwd=data,stdin=subprocess.PIPE if kind=='osintgram' else subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
             self.entries[kind]={'process':process,'port':port,'key':key,'job':None}

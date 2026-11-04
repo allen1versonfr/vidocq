@@ -1,9 +1,12 @@
 """Free anonymous Mwmbl search with optional Brave web-index retrieval. Never fetches original result URLs."""
+from run_control import read_bounded
 import copy,html,json,os,re,threading,time
 from urllib.error import HTTPError,URLError
 from urllib.parse import urlencode,urlparse
 from urllib.request import Request,HTTPRedirectHandler,build_opener,ProxyHandler
 from version import VERSION
+from concurrent.futures import Future
+from run_control import reserve,timeout
 
 class SearchNotConfigured(ValueError):pass
 class SearchLimit(ValueError):pass
@@ -17,8 +20,14 @@ class NoRedirect(HTTPRedirectHandler):
 class WebSearch:
     def __init__(self):
         self.key=os.environ.get('VIDOCQ_BRAVE_API_KEY','');self.enabled=bool(self.key);self.provider='brave' if self.key else 'mwmbl'
-        self.lock=threading.RLock();self.requests=0;self.free_lock=threading.Lock();self.next_free=0;self.cooldown_until=0;self.cache={}
+        self.lock=threading.RLock();self.requests=0;self.free_lock=threading.Lock();self.next_free=0;self.cooldowns={};self.cache={};self.inflight={};self.provider_counts={}
         self.other_keys={};self.session_limit=100
+    @property
+    def cooldown_until(self):return self.cooldowns.get(self.provider,0)
+    @cooldown_until.setter
+    def cooldown_until(self,value):self.cooldowns[self.provider]=value
+    def _attempt(self,provider):
+        reserve(provider);self.requests+=1;self.provider_counts[provider]=self.provider_counts.get(provider,0)+1
     def label(self):
         return {'brave':'Brave web index','mwmbl':'Mwmbl free web index','serper':'Serper Google results','serpapi':'SerpApi Google results'}[self.provider]
     def status(self):
@@ -31,6 +40,7 @@ class WebSearch:
         if not isinstance(data,dict) or type(data.get('enabled')) is not bool:raise ValueError('Choose whether web search is enabled.')
         key=data.get('key')
         with self.lock:
+            if self.inflight:raise ValueError('Wait for current search requests before changing the provider settings.')
             provider=data.get('provider','brave' if key else self.provider)
             if provider not in ('mwmbl','brave','serper','serpapi'):raise ValueError('Choose a supported search provider.')
             if key is not None and (not isinstance(key,str) or len(key)>500 or (key and not re.fullmatch(r'[A-Za-z0-9._-]+',key))):raise ValueError('Invalid API key format.')
@@ -49,32 +59,36 @@ class WebSearch:
         with self.free_lock:
             if time.monotonic()<self.cooldown_until:raise SearchLimit('Free search is cooling down after a provider rate/quota limit. No request sent; this is not a no-match result.')
             cached=self.cache.get(query)
-            if cached and time.monotonic()-cached[0]<900:return source,copy.deepcopy(cached[1])
+            if cached and time.monotonic()-cached[0]<900:
+                rows,diagnostics=copy.deepcopy(cached[1]);diagnostics['cache_hit']=True
+                return IndexResult(source,rows,diagnostics)
             if self.requests>=self.session_limit:raise SearchLimit('Configured session search limit reached.')
             delay=self.next_free-time.monotonic()
             if delay>0:time.sleep(delay)
             self.next_free=time.monotonic()+1.1
-            self.requests+=1
+            self._attempt('mwmbl')
             req=Request(source,headers={'User-Agent':'Vidocq/'+VERSION+' (+https://github.com/allen1versonfr/vidocq)','Accept':'application/json'})
             try:
-                with build_opener(NoRedirect()).open(req,timeout=20) as response:raw=response.read(2_000_001)
+                with build_opener(NoRedirect()).open(req,timeout=timeout(20)) as response:raw=read_bounded(response,2_000_000)
                 if len(raw)>2_000_000:raise ValueError('Free search response exceeded its size limit.')
                 try:data=json.loads(raw)
                 except (ValueError,UnicodeError):raise ValueError('Free search returned unreadable JSON, not a no-match result.') from None
                 if not isinstance(data,dict) or data.get('query')!=query or not isinstance(data.get('results'),list) or type(data.get('number_of_results')) is not int or data['number_of_results']!=len(data['results']):raise ValueError('Free search returned an unexpected response, not a no-match result.')
-                rows=[];seen=set()
-                for item in data['results']:
+                rows=[];seen=set();excluded={'unsafe_url':0,'outside_scope':0,'duplicate':0};examined=0
+                for rank,item in enumerate(data['results'],1):
+                    examined+=1
                     if not isinstance(item,dict) or not all(isinstance(item.get(k),str) for k in ('url','title','content')):raise ValueError('Free search returned malformed result data.')
                     url=item['url'];p=urlparse(url)
-                    if len(url)>2000 or p.scheme not in ('https','http') or not p.hostname or p.username or p.password:continue
-                    if site and not (p.hostname==site or p.hostname.endswith('.'+site)):continue
-                    if url in seen:continue
+                    if len(url)>2000 or p.scheme not in ('https','http') or not p.hostname or p.username or p.password or p.port is not None:excluded['unsafe_url']+=1;continue
+                    if site and not (p.hostname==site or p.hostname.endswith('.'+site)):excluded['outside_scope']+=1;continue
+                    if url in seen:excluded['duplicate']+=1;continue
                     seen.add(url)
                     text=lambda x:html.unescape(re.sub('<[^>]+>','',x))
-                    rows.append({'title':text(item['title'])[:500],'detail':text(item['content'])[:4000] or 'No index snippet supplied.','reference':url,'index_engine':str(item.get('engine','mwmbl'))[:80]})
+                    rows.append({'title':text(item['title'])[:500],'detail':text(item['content'])[:4000] or 'No index snippet supplied.','reference':url,'index_engine':str(item.get('engine','mwmbl'))[:80],'index_rank':rank})
                     if len(rows)==10:break
-                self.cache[query]=(time.monotonic(),copy.deepcopy(rows))
-                return source,rows
+                diagnostics={'provider_rows':len(data['results']),'examined_rows':examined,'retained_rows':len(rows),'excluded':excluded,'cache_hit':False,'result_limit':10}
+                self.cache[query]=(time.monotonic(),copy.deepcopy((rows,diagnostics)))
+                return IndexResult(source,rows,diagnostics)
             except HTTPError as error:
                 if error.code==429:
                     header=(error.headers or {}).get('Retry-After','60')
@@ -87,6 +101,21 @@ class WebSearch:
         if not isinstance(terms,list) or not 1<=len(terms)<=4 or any(not isinstance(t,str) or not t.strip() or len(t)>2000 or any(ord(c)<32 for c in t) for t in terms) or sum(len(t) for t in terms)>2200:raise ValueError('Invalid context search terms.')
         return self.search('',terms=terms)
     def search(self,value,site=None,terms=None):
+        identity=(self.provider,str(value),site,tuple(terms or []))
+        with self.lock:
+            future=self.inflight.get(identity);owner=future is None
+            if owner:future=Future();self.inflight[identity]=future
+        try:
+            if owner:
+                try:future.set_result(self._search(value,site,terms))
+                except Exception as error:future.set_exception(error);raise
+            result=future.result(timeout=timeout(45))
+            if isinstance(result,IndexResult):return IndexResult(result[0],copy.deepcopy(result[1]),copy.deepcopy(result.diagnostics))
+            return copy.deepcopy(result)
+        finally:
+            if owner:
+                with self.lock:self.inflight.pop(identity,None)
+    def _search(self,value,site=None,terms=None):
         if site is not None and site not in ('instagram.com','tiktok.com','vsco.co','steamcommunity.com'):raise ValueError('Unsupported social index scope.')
         with self.lock:
             if not self.enabled:raise SearchNotConfigured('Web search was not run: enable free Mwmbl search in Search connection. Brave is optional; no payment is needed for Mwmbl.')
@@ -107,10 +136,10 @@ class WebSearch:
                 return IndexResult(source,rows,diagnostics)
             if time.monotonic()<self.cooldown_until:raise SearchLimit('Brave search is cooling down after a quota/rate error; no request sent.')
             if self.requests>=self.session_limit:raise SearchLimit('Configured session search limit reached. Check your provider usage.')
-            self.requests+=1
+            self._attempt('brave')
         req=Request(source,headers={'User-Agent':'Vidocq/'+VERSION,'Accept':'application/json','X-Subscription-Token':key})
         try:
-            with build_opener(ProxyHandler({}),NoRedirect()).open(req,timeout=15) as response:raw=response.read(2_000_001)
+            with build_opener(ProxyHandler({}),NoRedirect()).open(req,timeout=timeout(15)) as response:raw=read_bounded(response,2_000_000)
             if len(raw)>2_000_000:raise ValueError('Search response exceeded its size limit.')
             try:data=json.loads(raw)
             except (ValueError,UnicodeError):raise ValueError('Search provider returned an unreadable response, not a no-match result.') from None
@@ -149,13 +178,15 @@ class WebSearch:
         with self.lock:
             if time.monotonic()<self.cooldown_until:raise SearchLimit('Search provider is cooling down after a rate/quota error.')
             cached=self.cache.get(identity)
-            if cached and time.monotonic()-cached[0]<900:return source,copy.deepcopy(cached[1])
+            if cached and time.monotonic()-cached[0]<900:
+                rows,diagnostics=copy.deepcopy(cached[1]);diagnostics['cache_hit']=True
+                return IndexResult(source,rows,diagnostics)
             if self.requests>=self.session_limit:raise SearchLimit('Configured session search limit reached.')
-            self.requests+=1
+            self._attempt(provider)
         if provider=='serper':req=Request(endpoint,data=json.dumps({'q':query,'num':10}).encode(),headers={'X-API-KEY':key,'Content-Type':'application/json'})
         else:req=Request(source+'&'+urlencode({'api_key':key,'num':10,'safe':'active'}),headers={'Accept':'application/json'})
         try:
-            with build_opener(ProxyHandler({}),NoRedirect()).open(req,timeout=20) as response:raw=response.read(2_000_001)
+            with build_opener(ProxyHandler({}),NoRedirect()).open(req,timeout=timeout(20)) as response:raw=read_bounded(response,2_000_000)
             if len(raw)>2_000_000:raise ValueError('Search response exceeded its size limit.')
             data=json.loads(raw)
             if not isinstance(data,dict) or 'error' in data or not isinstance(data.get('search_metadata',{}),dict) or data.get('search_metadata',{}).get('status')=='Error':raise ValueError('Provider returned an error; this is not an empty result.')
@@ -166,15 +197,19 @@ class WebSearch:
                 if not explicit_empty:raise ValueError('Search provider returned an unexpected response.')
                 items=[]
             if not isinstance(items,list):raise ValueError('Malformed search results.')
-            rows=[]
-            for item in items[:10]:
+            rows=[];seen=set();excluded={'unsafe_url':0,'outside_scope':0,'duplicate':0}
+            for rank,item in enumerate(items[:10],1):
                 if not isinstance(item,dict) or not isinstance(item.get('link'),str) or not isinstance(item.get('title'),str):raise ValueError('Malformed search result item.')
                 url=item['link'];p=urlparse(url)
-                if len(url)>2000 or p.scheme not in ('https','http') or not p.hostname or p.username or p.password or (site and not (p.hostname==site or p.hostname.endswith('.'+site))):continue
+                if len(url)>2000 or p.scheme not in ('https','http') or not p.hostname or p.username or p.password or p.port is not None:excluded['unsafe_url']+=1;continue
+                if site and not (p.hostname==site or p.hostname.endswith('.'+site)):excluded['outside_scope']+=1;continue
+                if url in seen:excluded['duplicate']+=1;continue
+                seen.add(url)
                 text=lambda v:html.unescape(re.sub('<[^>]+>','',str(v)))
-                rows.append({'title':text(item['title'])[:500],'detail':text(item.get('snippet','No index snippet supplied.'))[:4000],'reference':url})
-            with self.lock:self.cache[identity]=(time.monotonic(),copy.deepcopy(rows))
-            return source,rows
+                rows.append({'title':text(item['title'])[:500],'detail':text(item.get('snippet','No index snippet supplied.'))[:4000],'reference':url,'index_rank':rank})
+            diagnostics={'provider_rows':len(items),'examined_rows':min(10,len(items)),'retained_rows':len(rows),'excluded':excluded,'cache_hit':False,'result_limit':10}
+            with self.lock:self.cache[identity]=(time.monotonic(),copy.deepcopy((rows,diagnostics)))
+            return IndexResult(source,rows,diagnostics)
         except HTTPError as error:
             if error.code in (401,403):raise ValueError('Search provider rejected the key/plan. No automatic paid fallback was attempted.') from None
             if error.code==429:self.cooldown_until=time.monotonic()+60;raise SearchLimit('Search provider quota/rate limit reached; query incomplete.') from None

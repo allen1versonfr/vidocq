@@ -98,15 +98,15 @@ class EngineTests(unittest.TestCase):
 class HealthTests(unittest.TestCase):
     def test_verified_control_mismatch_disables_checker_until_control_passes(self):
         with tempfile.TemporaryDirectory() as temp:
-            client=MagicMock();client.quarantined_sites={};client.maigret.return_value={'results':[{'checks':[{'site':'GitHub','outcome':'absent'}]}]}
+            client=MagicMock();client.quarantined_sites={};client.maigret.return_value={'results':[{'checks':[{'site':'GitHub','outcome':'absent','diagnostics':{'checker_sha256':'fixture-hash','maigret_version':'fixture-version'}}]}]}
             health=CheckerHealth(temp,client);payload={'site':'GitHub','username':'publicfixture','expected':'candidate','public_verified_on':date.today().isoformat(),'public_verified':True,'consent':True}
             self.assertEqual(health.run(payload)['state'],'control-mismatch');self.assertIn('GitHub',client.quarantined_sites)
-            client.maigret.return_value={'results':[{'checks':[{'site':'GitHub','outcome':'blocked'}]}]}
+            client.maigret.return_value={'results':[{'checks':[{'site':'GitHub','outcome':'blocked','diagnostics':{'checker_sha256':'fixture-hash','maigret_version':'fixture-version'}}]}]}
             health.run(payload);restored=MagicMock();restored.quarantined_sites={};CheckerHealth(temp,restored)
             self.assertIn('GitHub',restored.quarantined_sites,'Unavailable retries must not clear a previous mismatch.')
-            client.maigret.return_value={'results':[{'checks':[{'site':'GitHub','outcome':'candidate'}]}]}
+            client.maigret.return_value={'results':[{'checks':[{'site':'GitHub','outcome':'candidate','diagnostics':{'checker_sha256':'fixture-hash','maigret_version':'fixture-version'}}]}]}
             self.assertEqual(health.run(payload)['state'],'partial-validation');self.assertIn('GitHub',client.quarantined_sites)
-            client.maigret.return_value={'results':[{'checks':[{'site':'GitHub','outcome':'absent'}]}]}
+            client.maigret.return_value={'results':[{'checks':[{'site':'GitHub','outcome':'absent','diagnostics':{'checker_sha256':'fixture-hash','maigret_version':'fixture-version'}}]}]}
             self.assertEqual(health.run({**payload,'username':'absentfixture','expected':'absent'})['state'],'passed');self.assertNotIn('GitHub',client.quarantined_sites)
             with self.assertRaises(ValueError):health.run({**payload,'public_verified':False})
 
@@ -125,6 +125,7 @@ class ManagedTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             Path(temp,'automations.json').write_text(json.dumps({'mwmbl':True,'maigret':True}))
             web,collectors,connectors,ai=[MagicMock() for _ in range(4)]
+            web.status.return_value={'enabled':False,'provider':'mwmbl'}
             setup=AutomationSetup(temp,web,collectors,connectors,ai);setup.manager=MagicMock();setup.start();setup.worker.join(3)
             web.configure.assert_called_once_with({'provider':'mwmbl','enabled':True});collectors.setup_maigret.assert_called_once()
             collectors.maigret.assert_not_called();connectors.osintgram.assert_not_called();ai.setup.assert_not_called()

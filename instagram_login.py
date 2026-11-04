@@ -3,13 +3,13 @@ import threading
 
 class InstagramLogin:
     def __init__(self,automation):self.automation=automation;self.saved_login='';self.lock=threading.RLock();self.last={'phase':'idle','busy':False,'connected':False,'message':'Connect your own operator account; this uses an Instagram session, not OAuth.'}
-    def status(self):
+    def status(self,persist=True):
         with self.lock:
             entry=self.automation.manager.entries.get('osintgram')
             if not entry or entry['process'].poll() is not None:return {**self.last,'busy':False,'connected':False,'saved':self.automation.vault.status()['instagram_saved']}
             state=self.automation.manager.request('osintgram','/api/auth/status')
-            if state.get('needs_reconnect') and not self.automation.vault.status().get('instagram_needs_reconnect'):self.automation.vault.invalidate_instagram()
-            if state['connected'] and state['login_id']!=self.saved_login:
+            if persist and state.get('needs_reconnect') and not self.automation.vault.status().get('instagram_needs_reconnect'):self.automation.vault.invalidate_instagram()
+            if persist and state['connected'] and state['login_id']!=self.saved_login:
                 credentials=self.automation.manager.request('osintgram','/api/auth/session',{})
                 self.automation.vault.save_instagram(credentials['username'],credentials['session']);self.saved_login=state['login_id']
                 self.automation.choices['osintgram']=True;self.automation.save()

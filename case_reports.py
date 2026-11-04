@@ -18,6 +18,7 @@ from assisted_investigation import options as investigation_options, execute as 
 from research_connectors import normalize_steam
 from discovery_review import locations,canonical_reference
 from discovery_tools import aliases
+from process_identity import birth
 
 FIELDS=('names','usernames','emails','phones','domains','ips','instagram','tiktok','vsco','steam','urls')
 LIMITS={'names':3,'usernames':5,'emails':5,'phones':5,'domains':5,'ips':5,'urls':10,'instagram':5,'tiktok':5,'vsco':5,'steam':5}
@@ -106,15 +107,19 @@ class CaseService:
         self.cancel_flags={};self.connectors=connectors
         self.collectors=collectors
         self.llm=None
+        self.configuration=lambda:{}
+        self.progress_state={}
         self.context_search=context_search or (lambda terms:{'results':[{'provider':'Context web search','status':'not-configured','message':'Context index search is not connected.','rows':[]}],'links':[]})
     def initialize(self):
         with self.database() as db:
             db.execute('CREATE TABLE IF NOT EXISTS cases (id TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL)')
             db.execute('CREATE TABLE IF NOT EXISTS case_runs (id TEXT PRIMARY KEY, case_id TEXT NOT NULL, data TEXT NOT NULL)')
-            rows=db.execute('SELECT id,data FROM case_runs').fetchall()
+            rows=db.execute("SELECT id,data FROM case_runs WHERE json_valid(data) AND json_extract(data,'$.status') IN ('queued','running')").fetchall()
             for key,raw in rows:
                 data=json.loads(raw)
-                if data['status'] in ('queued','running') and not process_alive(data.get('owner_pid')):
+                same_owner=bool(data['owner_birth']==birth(data.get('owner_pid')) and process_alive(data.get('owner_pid'))) if data.get('owner_birth') else process_alive(data.get('owner_pid'))
+                if not data.get('owner_birth'):data['recovery_identity']='Legacy PID only; process creation identity unavailable.'
+                if data['status'] in ('queued','running') and not same_owner and self.active!=key:
                     data.update(status='interrupted',message='Vidocq closed during this run. Start a new report to retry; completed snapshots remain available.')
                     db.execute('UPDATE case_runs SET data=? WHERE id=?',(json.dumps(data),key))
     def create(self,payload):
@@ -178,15 +183,32 @@ class CaseService:
     def list(self):
         with self.database() as db:rows=db.execute('SELECT data FROM cases ORDER BY updated_at DESC LIMIT 100').fetchall()
         return [json.loads(x[0]) for x in rows]
-    def runs(self,key):
+    def runs(self,key,metadata=False,offset=0):
         self.get(key)
+        if type(offset) is not int or not 0<=offset<=100000:raise ValueError('Invalid history offset.')
+        if metadata:
+            with self.database() as db:rows=db.execute("SELECT id,json_extract(data,'$.created_at'),json_extract(data,'$.status'),json_extract(data,'$.version') FROM case_runs WHERE case_id=? ORDER BY rowid DESC LIMIT 20 OFFSET ?",(key,offset)).fetchall()
+            return [dict(zip(('id','created_at','status','version'),row)) for row in rows]
         with self.database() as db:rows=db.execute('SELECT data FROM case_runs WHERE case_id=? ORDER BY rowid DESC LIMIT 20',(key,)).fetchall()
         return [json.loads(x[0]) for x in rows]
+    def progress(self,key):
+        with self.lock:
+            if key in self.progress_state:return copy.deepcopy(self.progress_state[key])
+        fields=('id','status','completed','total','message','version','finished_at')
+        sql=','.join("json_extract(data,'$."+field+"')" for field in fields)
+        with self.database() as db:row=db.execute('SELECT '+sql+' FROM case_runs WHERE id=?',(key,)).fetchone()
+        if not row:raise ValueError('Report not found.')
+        return dict(zip(fields,row))
+    def save_progress(self,data):
+        with self.lock:
+            if data['status'] in ('queued','running'):self.progress_state[data['id']]={k:data.get(k) for k in ('id','status','completed','total','message','version','finished_at')}
+            else:self.progress_state.pop(data['id'],None)
     def run(self,key):
         with self.database() as db:row=db.execute('SELECT data FROM case_runs WHERE id=?',(key,)).fetchone()
         if not row:raise ValueError('Report not found.')
         return json.loads(row[0])
     def _save_run(self,data):
+        self.save_progress(data)
         with self.database() as db:db.execute('UPDATE case_runs SET data=? WHERE id=?',(json.dumps(data),data['id']))
     def cancel(self,key):
         self.run(key)
@@ -204,6 +226,7 @@ class CaseService:
         with self.lock:
             if self.active:raise ValueError('Another case report is running. Wait for it to finish.')
             case=self.get(key)
+            clean_case(case,self.normalize)
             supplied=[]
             investigation=[]
             with self.database() as db:
@@ -222,10 +245,11 @@ class CaseService:
                     investigation=[item for item in items if key in item.get('case_ids',[]) or selected.intersection(item.get('evidence_ids',[]))]
             run={'id':secrets.token_hex(12),'case_id':key,'case':copy.deepcopy(case),'supplied_findings':supplied,
                 'investigation_items':investigation,
-                'version':VERSION,'owner_pid':os.getpid(),'created_at':now(),'status':'queued','completed':0,'total':0,'message':'Preparing report…','records':[],
+                'version':VERSION,'owner_pid':os.getpid(),'owner_birth':birth(os.getpid()),'created_at':now(),'status':'queued','completed':0,'total':0,'message':'Preparing report…','records':[],
                 'social_profiles':[{'platform':platform,'handle':handle,'reference':profile_reference(platform,handle),'status':'User supplied; not visited or verified'} for platform in PLATFORMS for handle in case.get(platform,[])],
                 'coverage':[],'prepared_searches':[],'phone_metadata':[],'limitations':[CAUTION,'Social profile, phone, email and username ownership is not verified. No calls, messages, account checks, direct profile visits or live target scans are performed.','Reference URLs and notes are context only. Original URLs are never fetched. Search links are prepared but not automatically run.']}
             opts=investigation_options(case.get('investigation'))
+            run['research_configuration']=copy.deepcopy(self.configuration())
             if continued_from:run['continued_from']=continued_from
             if opts['enabled']:
                 if self.collectors:

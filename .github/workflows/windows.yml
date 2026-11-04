@@ -24,11 +24,16 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install pinned build dependencies
-        run: python -m pip install -r requirements.txt pyinstaller==6.20.0
+        run: python -m pip install --require-hashes -r requirements-lock.txt
       - name: Generate Windows icon assets
         run: python scripts/build_icon.py
       - name: Test application and update recovery
         run: python -m unittest discover -s tests -v
+      - name: Scan locked main dependencies in an isolated tool environment
+        run: |
+          python -m venv .test-data/security-env
+          .test-data/security-env/Scripts/python.exe -m pip install pip-audit==2.10.1
+          .test-data/security-env/Scripts/python.exe -m pip_audit -r requirements-lock.txt --no-deps --disable-pip --require-hashes --strict --format json --output .test-data/dependency-security.json
       - name: Check live public index canaries
         run: python scripts/live_source_smoke.py
       - name: Validate frontend syntax

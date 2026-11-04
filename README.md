@@ -2,6 +2,8 @@
   <img src="docs/assets/vidocq-banner.svg" alt="Vidocq — Follow the evidence. Public indexes, local workspace." width="100%">
 </p>
 
+**2.18.0 audit update:** [Fixes, setup changes and validation limits](docs/AUDIT_FIXES.md).
+
 <p align="center">
   <strong>A portable research workspace for Windows.</strong><br>
   Search public indexes, trace image sources, and keep your findings together.

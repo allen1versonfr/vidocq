@@ -1,4 +1,5 @@
 """Vidocq Desktop. Local UI; allowlisted third-party indexes only."""
+from run_control import read_bounded
 import argparse
 import concurrent.futures
 from contextlib import closing
@@ -25,6 +26,8 @@ from burn import BurnManager
 from local_drafts import CLIENT as LOCAL_DRAFTS
 from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from local_http import LocalHTTPServer
+from run_control import timeout as bounded_timeout,reserve as reserve_request
 from pathlib import Path
 from urllib.error import HTTPError
 from urllib.parse import parse_qs, quote, urlencode, urlparse
@@ -67,8 +70,9 @@ class ProviderRedirect(HTTPRedirectHandler):
 
 def get_json(url):
     check_provider_url(url)
-    with build_opener(ProviderRedirect).open(Request(url, headers=HEADERS), timeout=12) as response:
-        raw = response.read(2_000_001)
+    reserve_request('index:'+urlparse(url).hostname)
+    with build_opener(ProviderRedirect).open(Request(url, headers=HEADERS), timeout=bounded_timeout(12)) as response:
+        raw = read_bounded(response,2_000_000)
         if len(raw)>2_000_000:
             raise ValueError('Provider response exceeded the 2 MB limit. Narrow the query.')
         return json.loads(raw)
@@ -238,7 +242,9 @@ def run_adapter(name,fn,value):
     try:
         result=fn(value);url,rows=result
         output={'provider':name,'status':'ok' if rows else 'empty','rows':rows,'source':url,'elapsed':round(time.monotonic()-started,1)}
-        if hasattr(result,'diagnostics'):output['retrieval_diagnostics']=result.diagnostics
+        if hasattr(result,'diagnostics'):
+            output['retrieval_diagnostics']=result.diagnostics
+            for row in rows:row['index_cache_hit']=bool(result.diagnostics.get('cache_hit'))
         return output
     except Exception as error:
         if isinstance(error,SearchNotConfigured):return {'provider':name,'status':'not-configured','rows':[],'message':str(error),'elapsed':round(time.monotonic()-started,1)}
@@ -255,7 +261,9 @@ def research(kind,value):
     if kind=='steam':adapters.append(('Steam / '+WEB_SEARCH.label(),lambda profile:WEB_SEARCH.search(profile,site='steamcommunity.com')))
     if kind in ('person','username','email','phone'):adapters.append((WEB_SEARCH.label(),WEB_SEARCH.search))
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-        results=list(pool.map(lambda pair:run_adapter(pair[0],pair[1],value),adapters))
+        from contextvars import copy_context
+        futures=[pool.submit(copy_context().run,run_adapter,pair[0],pair[1],value) for pair in adapters]
+        results=[future.result() for future in futures]
     flat=[dict(row,origin='offline-metadata' if r['provider']=='Offline phone metadata' else 'retrieved') for r in results for row in r['rows']]
     status,message=outcome(results,flat)
     return {'search_outcome':status,'search_message':message,'web_search':WEB_SEARCH.status(),'kind':kind,'query':value,'social_profile':({'platform':kind,'handle':value,'reference':profile_reference(kind,value),'status':'User supplied; not visited or verified'} if kind in PLATFORMS else None),'searched_at':datetime.now(timezone.utc).isoformat(),'results':results,'links':prepared_links(kind,value),'mode':'Third-party indexes only','notice':'No target-owned website, profile, DNS server, or IP is queried directly. Providers may log requests. There is no guarantee of anonymity or absence of notification.'}
@@ -281,6 +289,7 @@ def context_research(terms):
     return {'results':[run_adapter(WEB_SEARCH.label()+' context',lambda values:WEB_SEARCH.search_terms(values),terms)],'links':[]}
 CASES = CaseService(db,normalize,research,news_mentions,CONNECTORS,context_research,COLLECTORS)
 CASES.llm=LOCAL_DRAFTS
+CASES.configuration=lambda:{'search':AUTOMATION.search_status(),'model':LOCAL_DRAFTS.status(),'contract_version':2}
 from investigation import InvestigationService, compare_reports
 INVESTIGATION = InvestigationService(db)
 
@@ -323,7 +332,8 @@ class Handler(BaseHTTPRequestHandler):
         if route=='/api/local-ai':return self.send(200,LOCAL_AI.status())
         if route=='/api/automation':return self.send(200,AUTOMATION.status())
         if route=='/research-workflow.js':return self.send(200,(ROOT/'ui/research-workflow.js').read_bytes(),'application/javascript; charset=utf-8')
-        if route=='/api/instagram-login':return self.send(200,INSTAGRAM_LOGIN.status())
+        if route=='/api/instagram-login':
+            with CASES.lock:return self.send(200,INSTAGRAM_LOGIN.status(persist=not bool(CASES.active)))
         if route=='/api/automation/licenses':return self.send(200,{'text':(AUTOMATION.manager.bundle/'LICENSES.txt').read_text(encoding='utf-8')})
         if route=='/api/checker-controls':return self.send(200,CHECKER_HEALTH.status())
         if route=='/automation.js':return self.send(200,(ROOT/'ui/automation.js').read_bytes(),'application/javascript; charset=utf-8')
@@ -347,15 +357,18 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(200,content,'application/octet-stream')
             except ValueError as error:return self.send(404,{'error':str(error)})
         if route=='/vidocq-icon.svg':return self.send(200,(ROOT/'ui/vidocq-icon.svg').read_bytes(),'image/svg+xml')
-        if route=='/api/search-connection':return self.send(200,WEB_SEARCH.status())
+        if route=='/api/search-connection':return self.send(200,AUTOMATION.search_status())
         if route=='/api/cases':return self.send(200,CASES.list())
         match=re.fullmatch(r'/api/cases/([0-9a-f]{24})',route)
         runs=re.fullmatch(r'/api/cases/([0-9a-f]{24})/runs',route)
         report=re.fullmatch(r'/api/case-runs/([0-9a-f]{24})',route)
         try:
             if match:return self.send(200,CASES.get(match[1]))
-            if runs:return self.send(200,CASES.runs(runs[1]))
+            if runs:
+                query=parse_qs(urlparse(self.path).query)
+                return self.send(200,CASES.runs(runs[1],query.get('summary')==['1'],int(query.get('offset',['0'])[0])))
             if report:
+                if parse_qs(urlparse(self.path).query).get('progress')==['1']:return self.send(200,CASES.progress(report[1]))
                 data=CASES.run(report[1]);fmt=parse_qs(urlparse(self.path).query).get('format',['json'])[0]
                 if fmt=='html':return self.send(200,report_html(data).encode('utf-8'),'text/html; charset=utf-8')
                 if fmt=='markdown':return self.send(200,report_markdown(data).encode('utf-8'),'text/markdown; charset=utf-8')
@@ -375,6 +388,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send(404,{'error':'Not found.'})
 
     def do_POST(self):
+        guarded={'/api/search-connection','/api/collectors','/api/connectors','/api/local-drafts','/api/local-ai/setup','/api/local-ai/cancel','/api/local-ai/settings','/api/collectors/maigret/setup','/api/automation','/api/automation/credentials','/api/checker-controls'}
+        if self.path in guarded or self.path.startswith('/api/instagram-login/'):
+            if not self.authorized():return self.send(403,{'error':'Open the local app window first.'})
+            with CASES.lock:
+                if CASES.active:return self.send(409,{'error':'Finish or cancel the active report before changing research settings.'})
+                return self._do_POST()
+        return self._do_POST()
+    def _do_POST(self):
         if self.path=='/api/browser-relay':
             import hmac
             if self.headers.get('Host')!='127.0.0.1:'+str(self.server.server_port) or self.headers.get('Origin') or not hmac.compare_digest(self.headers.get('X-Vidocq-Relay',''),BROWSER_BRIDGE.key):return self.send(403,{'error':'Invalid native capture relay.'})
@@ -393,6 +414,8 @@ class Handler(BaseHTTPRequestHandler):
             p=json.loads(self.rfile.read(size))
             if not isinstance(p,dict):raise ValueError('Invalid request.')
             if BURN.pending:return self.send(409,{'error':'Vidocq burn is pending; new writes are disabled.'})
+            guarded={'/api/search-connection','/api/collectors','/api/connectors','/api/local-drafts','/api/local-ai/setup','/api/local-ai/cancel','/api/local-ai/settings','/api/collectors/maigret/setup'}
+            if self.path in guarded and CASES.active:return self.send(409,{'error':'Finish or cancel the active report before changing research settings.'})
             login=re.fullmatch(r'/api/instagram-login/(start|code|cancel|forget)',self.path)
             if login:
                 if CASES.active:raise ValueError('Finish or cancel the current case before changing the operator login.')
@@ -402,7 +425,7 @@ class Handler(BaseHTTPRequestHandler):
                 key,action=workflow.groups();case=CASES.get(key)
                 if action=='review-plan':
                     from research_workflow import review_plan
-                    runs=CASES.runs(key);return self.send(200,review_plan(case,runs[0] if runs else None))
+                    runs=CASES.runs(key,True);return self.send(200,review_plan(case,CASES.run(runs[0]['id']) if runs else None))
                 if action=='continue':return self.send(202,CASES.start(key,p.get('consent'),p.get('previous_run')))
                 from profile_evidence import reviewed_profile,capture_profile
                 result=capture_profile(p) if p.get('mode')=='public-fetch' else reviewed_profile(p)
@@ -615,7 +638,7 @@ def main():
         if args.update_ready:args.update_ready.write_text(VERSION,encoding='utf-8')
         print('Vidocq self-test passed.',flush=True)
         return
-    server=ThreadingHTTPServer(('127.0.0.1',args.port),Handler)
+    server=LocalHTTPServer(('127.0.0.1',args.port),Handler)
     server.daemon_threads=True
     url=f'http://127.0.0.1:{server.server_port}'
     BROWSER_BRIDGE.publish(server.server_port)

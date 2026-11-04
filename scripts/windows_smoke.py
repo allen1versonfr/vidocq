@@ -229,9 +229,8 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
                 context=json.loads(payload['messages'][1]['content'])
                 if 'queries' in context:result={'indexes':[0]}
                 elif 'next_steps' in context:result={'comparisons':[],'next_step_indexes':[0]}
-                else:
-                    row=context['records'][0];result={'claims':[{'citation':row['id'],'quote':row['excerpt'][:40],'text':'The source contains this quoted public excerpt.'}]}
-                    if '"leads"' in payload['messages'][0]['content']:result={'leads':[]}
+                elif 'links' in context:result={'link_ids':[]}
+                else:result={'selection_ids':[context['selections'][0]['id']]}
                 self.reply({'choices':[{'message':{'content':json.dumps(result)}}]})
         model_fixture=ThreadingHTTPServer(('127.0.0.1',0),ModelFixture);threading.Thread(target=model_fixture.serve_forever,daemon=True).start()
         try:

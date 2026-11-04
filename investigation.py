@@ -23,6 +23,16 @@ TABLES = {'findings': ('id', 'data'), 'cases': ('id', 'data', 'updated_at'),
 def now():
     return datetime.now(timezone.utc).isoformat()
 
+def validate_imported_case(value):
+    from case_reports import clean_case,FIELDS
+    from app import normalize
+    for field in FIELDS:
+        if field in value and not isinstance(value[field],(list,str)):raise ValueError('Invalid imported '+field+'.')
+    # Older context-only case folders remain restorable, but cannot run until edited.
+    payload=dict(value)
+    if not any(payload.get(f) for f in FIELDS if f!='urls'):payload['names']=['Imported context only']
+    clean_case(payload,normalize)
+
 def text(value, limit=10000):
     if not isinstance(value, str) or len(value) > limit:
         raise ValueError('Invalid or oversized text field.')
@@ -308,9 +318,24 @@ class InvestigationService:
                             if any(not isinstance(f['capture'].get(k,''),str) for k in ('provider','reference','query','retrieved_at','excerpt','origin')): raise ValueError()
                         elif table == 'cases':
                             if not isinstance(parsed.get('title'), str) or not isinstance(parsed.get('notebook_ids', []), list): raise ValueError()
+                            validate_imported_case(parsed)
+                            for decision in parsed.get('account_decisions',[]):
+                                from discovery_review import canonical_reference
+                                canonical_reference(decision['reference'])
+                                if decision.get('status') not in ('Confirmed','Rejected','Unverified') or not isinstance(decision.get('reason'),str):raise ValueError()
                         elif table == 'case_runs':
                             if parsed.get('case_id') != row[1] or parsed.get('status') not in ('complete', 'cancelled', 'interrupted', 'error', 'failed'): raise ValueError()
                             if not isinstance(parsed.get('records'), list) or not isinstance(parsed.get('case'), dict): raise ValueError()
+                            validate_imported_case(parsed['case'])
+                            from restore_schema import validate_report
+                            validate_report(parsed)
+                            if len(parsed['records'])>10000:raise ValueError()
+                            for record in parsed['records']:
+                                if not isinstance(record,dict) or any(not isinstance(record.get(k),str) for k in ('id','title','detail')):raise ValueError()
+                                if not re.fullmatch(r'R[0-9]{1,8}',record['id']):raise ValueError()
+                                if not isinstance(record.get('reference',''),str) or not isinstance(record.get('matched_inputs',[]),list):raise ValueError()
+                            for field in ('coverage','prepared_searches','supplied_findings'):
+                                if not isinstance(parsed.get(field,[]),list) or any(not isinstance(r,dict) for r in parsed.get(field,[])):raise ValueError()
                         elif table == 'investigation_items':
                             if row[1] not in ('entity', 'relationship', 'event') or not isinstance(parsed.get('label'), str): raise ValueError()
                             if not isinstance(parsed.get('notes'),str) or not isinstance(parsed.get('created_at'),str): raise ValueError()

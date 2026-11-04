@@ -33,12 +33,13 @@ class AutomationSetup:
         if self.worker and self.worker.is_alive():return
         self.worker=threading.Thread(target=self._start,daemon=True);self.worker.start()
     def _start(self):
-        if self.choices['mwmbl']:self.web.configure({'provider':'mwmbl','enabled':True});self.messages['mwmbl']='Free anonymous web search enabled. Major-index browser fallback is also available.'
+        if self.choices['mwmbl'] and not self.search_path.exists() and not self.web.status().get('enabled'):
+            self.web.configure({'provider':'mwmbl','enabled':True});self.messages['mwmbl']='Free anonymous web search enabled. Major-index browser fallback is also available.'
         try:
             if safe_path(self.search_path).is_file() and self.search_path.stat().st_size<4000:
                 prefs=json.loads(self.search_path.read_text(encoding='utf-8'));provider=prefs.get('provider')
-                if provider not in ('serper','serpapi'):raise ValueError('Invalid saved search provider.')
-                self.web.configure({**prefs,'key':self.vault.search_key(provider)})
+                if provider not in ('mwmbl','brave','serper','serpapi'):raise ValueError('Invalid saved search provider.')
+                self.web.configure({**prefs,**({'key':self.vault.search_key(provider)} if provider!='mwmbl' else {})})
         except (OSError,ValueError):self.messages['search']='Saved search connection could not be restored. Enter its key in Search connection.'
         for kind in ('maigret','harvester','photon','osintgram'):
             try:
@@ -69,13 +70,20 @@ class AutomationSetup:
         self.start();return result
     def search(self,p):
         provider=p.get('provider',self.web.provider);payload=dict(p)
-        if provider in ('serper','serpapi') and 'key' not in payload:payload['key']=self.vault.search_key(provider) or self.web.other_keys.get(provider,'')
+        if provider in ('brave','serper','serpapi') and 'key' not in payload:payload['key']=self.vault.search_key(provider) or (self.web.key if provider=='brave' else self.web.other_keys.get(provider,''))
         state=self.web.configure(payload)
-        if provider in ('serper','serpapi') and p.get('remember') is True:
-            self.vault.save_search(provider,payload.get('key',''));prefs={'provider':provider,'enabled':state['enabled'],'session_limit':state['session_limit']}
+        if p.get('remember') is True:
+            if provider!='mwmbl':self.vault.save_search(provider,payload.get('key',''))
+            prefs={'provider':provider,'enabled':state['enabled'],'session_limit':state['session_limit']}
             temp=safe_path(self.search_path.with_name('search-connection.json.part'));temp.write_text(json.dumps(prefs),encoding='utf-8');temp.replace(safe_path(self.search_path))
         if p.get('forget_saved') is True:
-            if provider in ('serper','serpapi'):self.vault.save_search(provider,'')
+            if provider in ('brave','serper','serpapi'):self.vault.save_search(provider,'')
             safe_path(self.search_path).unlink(missing_ok=True)
+        return self.search_status()
+    def search_status(self):
+        state=self.web.status();state['next_start_provider']=None
+        try:
+            if self.search_path.is_file() and self.search_path.stat().st_size<4000:state['next_start_provider']=json.loads(self.search_path.read_text(encoding='utf-8')).get('provider')
+        except (OSError,ValueError):pass
         return state
     def stop(self):self.manager.stop()
