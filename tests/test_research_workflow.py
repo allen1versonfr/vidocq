@@ -32,6 +32,13 @@ class WorkflowEngineTests(unittest.TestCase):
     run_case=engine_fixtures.EngineTests.run_case
     research=engine_fixtures.EngineTests.research
     context=engine_fixtures.EngineTests.context
+    def test_discovery_pages_only_trigger_variations_without_counting_as_accounts(self):
+        def noisy(terms):return {'results':[{'provider':'Brave web index','status':'ok','rows':[{'title':'Example Person example','detail':'Example Person example in a name list','reference':'https://www.tiktok.com/discover/example'}]}],'links':[]}
+        self.service.context_search=noisy;self.service.research=lambda k,v:noisy([v])
+        case=self.make(investigation={'enabled':True,'allow_maigret':False,'adaptive_queries':True,'adaptive_searches':2,'max_searches':6})
+        run=self.run_case(case)
+        self.assertTrue(run['query_variations']);self.assertTrue(all(v['trigger_reason']=='discovery-pages-only' for v in run['query_variations']))
+        self.assertEqual(run['analysis']['counts']['candidate_accounts'],0);self.assertLessEqual(run['completed'],6)
     def test_empty_index_variations_run_within_cap_using_supplied_identifiers_only(self):
         def empty(terms):self.contexts.append(terms);return {'results':[{'provider':'Mwmbl free web index','status':'empty','rows':[]}],'links':[]}
         self.service.context_search=empty;self.service.research=lambda k,v:empty([v])

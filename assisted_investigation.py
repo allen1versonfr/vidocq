@@ -10,6 +10,7 @@ from research_connectors import normalize_steam
 from social_profiles import detect_platform, normalize_profile, profile_reference
 from collector_policy import HARVESTER_SOURCES,MAIGRET_SITES,DEFAULT_MAIGRET_SITES,selected
 from discovery_tools import query_plan
+from evidence_quality import source_quality
 
 KINDS={'names':'person','usernames':'username','emails':'email','phones':'phone','domains':'domain','ips':'ip','instagram':'instagram','tiktok':'tiktok','vsco':'vsco','steam':'steam'}
 COMMANDS=('get_user_info','get_account_about','get_captions','get_hashtags')
@@ -88,7 +89,9 @@ def relevance(case,record):
                 strong=strong or field in ('phones','emails','steam')
     # Matching several identifiers is corroborating relevance, not ownership verification.
     label='Multiple supplied identifiers co-occur' if len(matched)>=2 else 'Matches one supplied identifier' if matched else 'Unlinked result — needs review'
-    return {'label':label,'matched_identifiers':matched,'strong_anchor':strong,'can_expand':strong or len(matched)>=2,
+    quality=source_quality(record)
+    if quality['kind']=='discovery_page':label=quality['reason']
+    return {'label':label,'matched_identifiers':matched,'strong_anchor':strong,'can_expand':quality['kind']!='discovery_page' and (strong or len(matched)>=2),
             'notice':'Co-occurrence is not proof of identity. A result may concern a namesake, recycled number or unrelated account.'}
 
 def extract_clues(blob,normalize):
@@ -122,6 +125,7 @@ def synthesis(run):
         bucket='stronger_leads' if len(r.get('matched_identifiers',[]))>=2 else 'needs_review' if r.get('matched_identifiers') else 'unlinked_results'
         if record.get('analyst_status')=='Rejected':bucket='rejected_evidence'
         elif record.get('lead_only'):bucket='needs_review'
+        if source_quality(record)['kind']=='discovery_page' and bucket!='rejected_evidence':bucket='unlinked_results'
         grouped[bucket].append({'citation':record['id'],'title':record['title'],'reason':r.get('label','Supplied or offline context; not independently verified.'),'matched_identifiers':r.get('matched_identifiers',[])})
         reported=record.get('observations',{}).get('reported_name')
         names=run['case'].get('names',[])
@@ -131,8 +135,10 @@ def synthesis(run):
     stronger=len(grouped['stronger_leads'])
     confirmed={r['reference'] for r in records if r.get('analyst_status')=='Confirmed' and r.get('reference')}
     counts={'raw_records':len(records),'candidate_records':len(grouped['stronger_leads'])+len(grouped['needs_review']),'unlinked_records':len(grouped['unlinked_results']),'rejected_records':len(grouped['rejected_evidence']),'analyst_confirmed_accounts':len(confirmed)}
+    from discovery_review import canonical_reference
+    counts['candidate_accounts']=len({canonical_reference(r['reference']) for r in records if source_quality(r)['account_candidate'] and r.get('analyst_status')!='Rejected' and r.get('relevance',{}).get('matched_identifiers')})
     headline=('Evidence records containing multiple supplied identifiers: '+str(stronger)+'. Review their citations before attributing them to the same person.' if stronger else 'No record linked multiple supplied identifiers. Returned leads remain unverified; no identity conclusion was made.')
-    headline='Raw records: '+str(counts['raw_records'])+'; relevant candidates: '+str(counts['candidate_records'])+'; analyst-confirmed accounts: '+str(len(confirmed))+'. '+headline
+    headline='Raw records: '+str(counts['raw_records'])+'; relevant candidate records: '+str(counts['candidate_records'])+'; distinct candidate profile URLs: '+str(counts['candidate_accounts'])+'; analyst-confirmed accounts: '+str(len(confirmed))+'. '+headline
     if run.get('cancel_requested'):headline='Investigation cancelled. This report contains partial results only. '+headline
     return dict(grouped,counts=counts,headline=headline,coverage_gaps=gaps,review_flags=flags,
                 unanswered=['Ownership of supplied and discovered accounts is not established.','Missing results may reflect source coverage, privacy settings, access failures or search limits.'],
@@ -191,6 +197,7 @@ def execute(service,run):
         if isinstance(row.get('observations'),dict):entry['observations']=row['observations']
         if row.get('lead_only'):entry['lead_only']=True
         if isinstance(row.get('attribution'),dict):entry['attribution']=row['attribution']
+        entry['source_quality']=source_quality(entry)
         entry['relevance']=relevance(case,entry);apply_decision(case,entry);records[fingerprint]=entry
         return entry
     for finding in run['supplied_findings']:
@@ -275,6 +282,7 @@ def execute(service,run):
                 for row in rows:
                     origin='offline-metadata' if label=='Offline phone metadata' else 'retrieved'
                     entry=record(label,provider.get('source',''),row,task,origin)
+                    if entry['source_quality']['kind']=='discovery_page':continue
                     profile=row.get('observations',{}).get('profile') if isinstance(row.get('observations'),dict) else None
                     if profile and isinstance(profile,dict) and entry.get('analyst_status')!='Rejected':
                         from profile_evidence import reviewed_profile
@@ -306,10 +314,11 @@ def execute(service,run):
                         if scheduled:enqueue(clue['kind'],clue['value'],clue['depth'],entry['id'],'discovered');followups+=1
                         else:seen.add(identity)
         empty_index=any(p.get('status')=='empty' for result in reports for p in result.get('results',[]) if any(name in p.get('provider','') for name in ('Mwmbl','Brave','Serper','SerpApi')))
-        if opts['adaptive_queries'] and empty_index and task['depth']==0:
+        noisy_index=any(p.get('status')=='ok' and p.get('rows') and all(source_quality(r)['kind']=='discovery_page' for r in p['rows']) for result in reports for p in result.get('results',[]) if any(name in p.get('provider','') for name in ('Mwmbl','Brave','Serper','SerpApi')))
+        if opts['adaptive_queries'] and (empty_index or noisy_index) and task['depth']==0:
             while query_variants and len(run['query_variations'])<opts['adaptive_searches'] and run['completed']+len(queue)+1<opts['max_searches']:
                 variant=query_variants.popleft()
-                if enqueue('context',variant['terms'],origin='empty-result-query-variation'):run['query_variations'].append(dict(variant,trigger=seed))
+                if enqueue('context',variant['terms'],origin='empty-result-query-variation'):run['query_variations'].append(dict(variant,trigger=seed,trigger_reason='discovery-pages-only' if noisy_index else 'empty-index'))
         run['completed']+=1
         run['search_log'].append(dict(task,status='completed',seed=seed))
         if task['origin']=='local-ai-approved-query-plan':run['ai']['executed_queries']+=1

@@ -3,6 +3,7 @@ import json
 import re
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler
 from discovery_tools import query_plan,research_plan,public_url
+from evidence_quality import ranked_ai_records
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -31,7 +32,7 @@ class LocalDrafts:
         if mode=='planning':
             novel=[q for q in plan if q['reason'] in ('name and supplied handle co-occurrence','handle and supplied location co-occurrence','analyst-approved name spelling variant')]
             if novel:plan=novel
-        records=[{'id':r['id'],'title':r.get('title','')[:300],'excerpt':r.get('detail','')[:1500],'reference':r.get('reference','')} for r in (run or {}).get('records',[]) if r.get('analyst_status')!='Rejected'][:12]
+        records=[{'id':r['id'],'title':r.get('title','')[:300],'excerpt':r.get('detail','')[:1500],'reference':r.get('reference','')} for r in ranked_ai_records((run or {}).get('records',[]))[:12]]
         if mode in ('summary','leads','synthesis','assessment') and not records:raise ValueError('Select a report with non-rejected records first.')
         context={'queries':[{'index':i,**x} for i,x in enumerate(plan)]} if mode in ('queries','planning') else {'records':records}
         if mode=='assessment':
@@ -66,7 +67,7 @@ class LocalDrafts:
                 if any(not isinstance(q,str) or not 10<=len(q)<=400 or q not in lookup[i]['excerpt'] for i,q in zip(ids,quotes)):raise ValueError('Comparison contains an unsupported quotation.')
                 source=' '.join(lookup[i]['excerpt'] for i in ids)
                 if not isinstance(text,str) or not 1<=len(text)<=500 or re.search(r'(?i)(belongs to|owned by|confirmed identity|definitely the same|is guilty)',text) or any(t not in source for t in re.findall(r'https?://\S+|\b\S+@\S+\.\S+|\b\d[\d.,%-]*\b',text)):raise ValueError('Unsupported comparison assertion.')
-                cleaned.append({'type':item['type'],'citations':ids,'quotes':quotes,'explanation':text})
+                cleaned.append({'type':item['type'],'citations':ids,'quotes':quotes,'explanation':'Compare the two cited excerpts; a relationship between their subjects is not established.'})
             return {'mode':mode,'draft':True,'comparisons':cleaned,'next_steps':[NEXT_STEPS[i] for i in dict.fromkeys(steps)],'notice':'Cited review proposals and finite next actions; semantic accuracy and ownership still require analyst review.'}
         if mode in ('queries','planning'):
             indexes=result.get('indexes')
@@ -97,7 +98,7 @@ class LocalDrafts:
                 if not isinstance(text,str) or not 1<=len(text)<=600 or re.search(r'(?i)(belongs to|owned by|confirmed identity|definitely the same|is guilty)',text):raise ValueError('Unsupported identity assertion in AI draft.')
                 tokens=re.findall(r'https?://\S+|\b\S+@\S+\.\S+|\b\d[\d.,%-]*\b',text)
                 if any(token not in record['excerpt'] for token in tokens):raise ValueError('AI draft introduced unsupported identifiers or numbers.')
-                cleaned[-1]['text']=text
+                cleaned[-1]['text']='Source excerpt selected for review; no relationship or ownership inference is established.'
         return {'mode':mode,'draft':True,'claims':cleaned,'notice':'Model-selected source excerpts, not verified facts or ownership conclusions. Compare each quotation with its source.'}
 
 
