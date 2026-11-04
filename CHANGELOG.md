@@ -1,3 +1,7 @@
+# 2.17.2 — Brave retrieval auditing and bounded query refinement
+
+Cache repeated Brave queries for 15 minutes within the session without charging the request budget again; stop new Brave requests during quota cooldown. Preserve provider rank and request-local counts for examined, retained, out-of-scope, unsafe, malformed and duplicate rows. Include the audit in report coverage and exports. Offline diagnostics distinguish all-rows-filtered from provider-empty responses. Prioritize separate supplied first/last name tokens before adding exact-match constraints in approved adaptive searches. No new provider, identifier guessing, automatic paid fallback or extra budget.
+
 # 2.17.1 — Evidence quality and retrieval diagnosis
 
 Separate discovery/category pages from account candidates; retain them in the evidence trail but prevent automatic clue expansion and AI association claims from them. Prioritize observed profiles and identifier matches before the model context limit. Distinguish candidate records from distinct candidate profile URLs. Apply bounded query variations to discovery-only results as well as empty searches. Replace model-written relationship explanations with neutral labels beside exact validated quotations. Add an offline control diagnostic with distinct not-searched, incomplete, empty, wrong-result and post-retrieval-loss stages.

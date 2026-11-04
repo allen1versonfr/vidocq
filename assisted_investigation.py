@@ -25,6 +25,7 @@ def report_sections(run):
     sections.append(('Discovered clues and follow-up trail',[(x['kind']+': '+x['value']+' · from ['+x['parent_citation']+'] · '+x['status']+' · '+x['reason']) for x in run.get('discovered_clues',[])] or ['No additional explicit identifiers discovered.']))
     sections.append(('Search gaps',[x.get('input','')+' · '+x.get('provider','')+' · '+x.get('status','')+' · '+x.get('message','') for x in analysis.get('coverage_gaps',[])] + ['Unsearched: '+json.dumps(x,ensure_ascii=False) for x in run.get('search_log',[]) if x['status']=='not-run'] or ['No logged source failures or unsearched inputs. Coverage still depends on selected providers.']))
     sections.append(('Platform check diagnostics',[c.get('seed','')+' · '+x.get('site','')+' · '+x.get('outcome','unknown')+' · '+x.get('reason','') for c in run.get('coverage',[]) for x in c.get('checks',[])] or ['No per-site checks recorded.']))
+    sections.append(('Search retrieval audit',[c.get('seed','')+' · '+json.dumps(c['retrieval_diagnostics'],ensure_ascii=False) for c in run.get('coverage',[]) if c.get('retrieval_diagnostics')] or ['No adapter-level retrieval counts recorded.']))
     sections.append(('Unanswered questions',analysis['unanswered']))
     sections.append(('Published links and imported leads', ['['+x['citation']+'] '+x['source']+' → '+x['target']+' · '+x['relation']+' · '+x['observed_at'] for x in run.get('link_evidence',[])] or ['No captured link evidence.']))
     sections.append(('Historical aliases (supplied, unverified)',[json.dumps(x,ensure_ascii=False) for x in run['case'].get('aliases',[])] or ['None supplied.']))
@@ -279,6 +280,7 @@ def execute(service,run):
                     from additional_collectors import HIBP_ATTRIBUTION
                     run['attributions']=[HIBP_ATTRIBUTION]
                 run['coverage'].append({'seed':seed,'provider':label,'status':provider.get('status','error'),'count':len(rows),'source':provider.get('source',''),'message':provider.get('message',''),'checks':provider.get('checks',[])})
+                if isinstance(provider.get('retrieval_diagnostics'),dict):run['coverage'][-1]['retrieval_diagnostics']=provider['retrieval_diagnostics']
                 for row in rows:
                     origin='offline-metadata' if label=='Offline phone metadata' else 'retrieved'
                     entry=record(label,provider.get('source',''),row,task,origin)

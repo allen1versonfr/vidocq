@@ -7,6 +7,10 @@ from version import VERSION
 
 class SearchNotConfigured(ValueError):pass
 class SearchLimit(ValueError):pass
+class IndexResult(tuple):
+    """Backward-compatible (source, rows) with request-local adapter diagnostics."""
+    def __new__(cls,source,rows,diagnostics):
+        result=super().__new__(cls,(source,rows));result.diagnostics=diagnostics;return result
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self,*args,**kwargs):raise ValueError('Search API redirected; the key was not forwarded.')
 
@@ -89,17 +93,24 @@ class WebSearch:
             provider=self.provider
             key=self.other_keys.get(provider,'') if provider in ('serper','serpapi') else self.key
             if provider!='mwmbl' and not key:raise SearchNotConfigured('Search provider is not configured. Choose free Mwmbl or add your own key.')
-            if self.requests>=self.session_limit:raise SearchLimit('Configured session search limit reached. Check your provider usage.')
-            if provider=='brave':self.requests+=1
         query='"'+str(value).replace('"','').replace('\\','')+'"'
         if terms is not None:query=' '.join('"'+str(t).replace('"','').replace('\\','')+'"' for t in terms)
         if site:query='site:'+site+' '+query
         if provider=='mwmbl':return self._free_search(query,site)
         if provider in ('serper','serpapi'):return self._major_search(provider,key,query,site)
         source='https://api.search.brave.com/res/v1/web/search?'+urlencode({'q':query,'count':10,'safesearch':'moderate','text_decorations':'false'})
+        identity=('brave',query,site)
+        with self.lock:
+            cached=self.cache.get(identity)
+            if cached and time.monotonic()-cached[0]<900:
+                rows,diagnostics=copy.deepcopy(cached[1]);diagnostics['cache_hit']=True
+                return IndexResult(source,rows,diagnostics)
+            if time.monotonic()<self.cooldown_until:raise SearchLimit('Brave search is cooling down after a quota/rate error; no request sent.')
+            if self.requests>=self.session_limit:raise SearchLimit('Configured session search limit reached. Check your provider usage.')
+            self.requests+=1
         req=Request(source,headers={'User-Agent':'Vidocq/'+VERSION,'Accept':'application/json','X-Subscription-Token':key})
         try:
-            with build_opener(NoRedirect()).open(req,timeout=15) as response:raw=response.read(2_000_001)
+            with build_opener(ProxyHandler({}),NoRedirect()).open(req,timeout=15) as response:raw=response.read(2_000_001)
             if len(raw)>2_000_000:raise ValueError('Search response exceeded its size limit.')
             try:data=json.loads(raw)
             except (ValueError,UnicodeError):raise ValueError('Search provider returned an unreadable response, not a no-match result.') from None
@@ -108,18 +119,26 @@ class WebSearch:
             if web is None:results=[]
             elif not isinstance(web,dict) or not isinstance(web.get('results'),list):raise ValueError('Search provider returned an unexpected web-result format.')
             else:results=web['results']
-            rows=[]
-            for item in results[:10]:
-                if not isinstance(item,dict):continue
+            rows=[];excluded={'malformed':0,'unsafe_url':0,'outside_scope':0,'duplicate':0};seen=set()
+            for rank,item in enumerate(results[:10],1):
+                if not isinstance(item,dict):excluded['malformed']+=1;continue
                 url=str(item.get('url',''));p=urlparse(url)
-                if p.scheme not in ('https','http') or not p.hostname or p.username or p.password:continue
-                if site and not (p.hostname==site or p.hostname.endswith('.'+site)):continue
+                try:invalid_port=p.port is not None
+                except ValueError:invalid_port=True
+                if len(url)>2000 or p.scheme not in ('https','http') or not p.hostname or p.username or p.password or invalid_port:excluded['unsafe_url']+=1;continue
+                if site and not (p.hostname==site or p.hostname.endswith('.'+site)):excluded['outside_scope']+=1;continue
+                if url in seen:excluded['duplicate']+=1;continue
+                seen.add(url)
                 text=lambda x:html.unescape(re.sub('<[^>]+>','',str(x)))
-                rows.append({'title':text(item.get('title','Indexed page'))[:500],'detail':text(item.get('description','No index snippet supplied.'))[:4000], 'reference':url[:2000]})
-            return source,rows
+                rows.append({'title':text(item.get('title','Indexed page'))[:500],'detail':text(item.get('description','No index snippet supplied.'))[:4000], 'reference':url,'index_rank':rank})
+            diagnostics={'provider_rows':len(results),'examined_rows':min(10,len(results)),'retained_rows':len(rows),'excluded':excluded,'cache_hit':False,'query_mode':'quoted-terms','result_limit':10}
+            with self.lock:self.cache[identity]=(time.monotonic(),copy.deepcopy((rows,diagnostics)))
+            return IndexResult(source,rows,diagnostics)
         except HTTPError as error:
             if error.code in (401,403):raise ValueError('Search API key or plan was rejected. Check your Brave Search subscription and key; this is not a no-match result.') from None
-            if error.code==429:raise ValueError('Search API quota/rate limit reached. Check provider usage; the query did not complete.') from None
+            if error.code==429:
+                self.cooldown_until=time.monotonic()+60
+                raise SearchLimit('Search API quota/rate limit reached. Check provider usage; the query did not complete.') from None
             raise ValueError('Search provider unavailable (HTTP '+str(error.code)+'). Query did not complete.') from None
         except (URLError,TimeoutError,OSError):raise ValueError('Could not reach the search API. Check network/proxy settings; the query did not complete.') from None
 

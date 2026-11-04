@@ -1,3 +1,9 @@
+# Validation for Vidocq 2.17.2
+
+278 Python tests pass locally (one Windows symlink-capability skip). Synthetic Brave fixtures prove cache hits preserve copies and do not spend request budget, quota cooldown prevents repeated network attempts, provider/adapter counts and source rank survive the adapter, API keys remain absent from reports, and all-filtered responses are diagnosed separately from empty results. Finite query-order fixtures prioritize supplied first/last tokens. No live paid or personal queries were made. CI runs Windows packaged smoke/update/recovery checks before publication. This is retrieval instrumentation and query refinement, not evidence of improved real-world recall.
+
+Previous validation:
+
 # Validation for Vidocq 2.17.1
 
 273 Python tests pass locally with one Windows symlink-capability skip. New regression fixtures verify that discovery pages matching multiple supplied identifiers cannot inflate candidate counts or seed expansion, actual profile URLs retain their type, profiles beyond the first 12 noisy rows reach AI context, model-inferred associations are replaced with neutral quotation labels, and offline diagnostics distinguish empty, incomplete, wrong-result and post-retrieval-loss stages. Discovery-only variations stay within the existing approved search budget. Historical private control/report replay is offline and excluded from version control; original sealed artifacts remain unchanged. No score increase or index-absence conclusion is inferred. CI performs packaged Windows smoke/update/recovery validation before publication.

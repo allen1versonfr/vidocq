@@ -236,8 +236,10 @@ ADAPTERS={'domain':[('Internet Archive index',archive),('Certificate Transparenc
 def run_adapter(name,fn,value):
     started=time.monotonic()
     try:
-        url,rows=fn(value)
-        return {'provider':name,'status':'ok' if rows else 'empty','rows':rows,'source':url,'elapsed':round(time.monotonic()-started,1)}
+        result=fn(value);url,rows=result
+        output={'provider':name,'status':'ok' if rows else 'empty','rows':rows,'source':url,'elapsed':round(time.monotonic()-started,1)}
+        if hasattr(result,'diagnostics'):output['retrieval_diagnostics']=result.diagnostics
+        return output
     except Exception as error:
         if isinstance(error,SearchNotConfigured):return {'provider':name,'status':'not-configured','rows':[],'message':str(error),'elapsed':round(time.monotonic()-started,1)}
         message='Provider unavailable or request timed out. This is not a no-match result.'
