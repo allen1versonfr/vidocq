@@ -1,3 +1,7 @@
+# 2.17.1 — Evidence quality and retrieval diagnosis
+
+Separate discovery/category pages from account candidates; retain them in the evidence trail but prevent automatic clue expansion and AI association claims from them. Prioritize observed profiles and identifier matches before the model context limit. Distinguish candidate records from distinct candidate profile URLs. Apply bounded query variations to discovery-only results as well as empty searches. Replace model-written relationship explanations with neutral labels beside exact validated quotations. Add an offline control diagnostic with distinct not-searched, incomplete, empty, wrong-result and post-retrieval-loss stages.
+
 # 2.17.0
 
 Added guided instagrapi operator login with 2FA, encrypted session retention and explicit reconnect; optional encrypted Serper/SerpApi search connections; reviewed/direct public-profile metadata and platform-scoped ID/link graphs; bounded empty-result variations; guided new-report continuation; source-quoted AI comparisons/next evidence; paired dated checker controls with history/fingerprints. See docs/GUIDED_INSTAGRAM_LOGIN.md. Live account/provider authentication requires user-supplied credentials; private benchmarks are not shipped.

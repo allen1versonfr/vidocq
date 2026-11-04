@@ -1,3 +1,13 @@
+# Vidocq 2.17.1
+
+This patch addresses noisy discovery results rather than adding providers. Generic social discovery pages remain visible as context but no longer inflate candidate counts, seed follow-ups, or enter AI claim/comparison context. Observed profiles and identifier matches get priority before the AI context limit. Reports distinguish candidate records from distinct candidate profile URLs. Empty and discovery-only searches can trigger approved bounded query variations. AI explanations use neutral labels beside validated quotations to avoid publishing model-inferred associations as source facts.
+
+An offline diagnostic can inspect sealed controls without spending API credit: `python scripts/diagnose_retrieval.py --answer-sheet LOCAL_KEY.json --controls LOCAL_CONTROLS --output LOCAL_DIAGNOSIS.json`. All paths are operator-selected; keep private inputs and outputs outside version control. A missing target is not labeled absent from the index.
+
+Local validation: 273 Python tests pass (one Windows symlink skip), including synthetic discovery-page, AI-context ranking, unsupported-association and retrieval-stage regressions. Offline replay of existing private reports is local only. No new live personal queries were made for this patch. No discovery-score improvement is claimed; the patch improves evidence handling and exposes retrieval failures. Windows release validation runs separately in CI.
+
+Previous release:
+
 # Vidocq 2.17.0 - Guided operator login and broader research
 
 - Included instagrapi 3.2.2 operator login, 2FA, encrypted saved sessions, cancel/forget and explicit reconnect. No OAuth claim or silent reauthentication during target lookups.

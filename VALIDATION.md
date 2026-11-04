@@ -1,3 +1,9 @@
+# Validation for Vidocq 2.17.1
+
+273 Python tests pass locally with one Windows symlink-capability skip. New regression fixtures verify that discovery pages matching multiple supplied identifiers cannot inflate candidate counts or seed expansion, actual profile URLs retain their type, profiles beyond the first 12 noisy rows reach AI context, model-inferred associations are replaced with neutral quotation labels, and offline diagnostics distinguish empty, incomplete, wrong-result and post-retrieval-loss stages. Discovery-only variations stay within the existing approved search budget. Historical private control/report replay is offline and excluded from version control; original sealed artifacts remain unchanged. No score increase or index-absence conclusion is inferred. CI performs packaged Windows smoke/update/recovery validation before publication.
+
+Previous validation:
+
 # Validation for Vidocq 2.17.0
 
 The 266-test Python suite passes locally (one Windows symlink-capability skip). All ten UI scripts and the extension pass syntax checks. New DOM fixtures execute the assembled interface with synthetic responses and validate guided 2FA screens, password/code clearing, key separation when changing providers, search setup, profile evidence, case settings and consented report continuation. These are offline DOM tests, not a visual browser validation.
