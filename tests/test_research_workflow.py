@@ -64,7 +64,7 @@ class AssessmentTests(unittest.TestCase):
     setUp=draft_fixtures.DraftTests.setUp
     generate=draft_fixtures.DraftTests.generate
     def test_comparisons_require_two_cited_quotes_and_known_next_steps(self):
-        self.run['records'].append({'id':'R2','detail':'A different public source has a different display name.','reference':'https://example.org/other'})
+        self.run['records'].append({'id':'R2','detail':'A different public source has a different display name.','reference':'https://example.org/other','analyst_status':'Confirmed'})
         comparison={'type':'difference','citations':['R1','R2'],'quotes':['published public source','different display name'],'explanation':'The cited excerpts describe different public source text.'}
         result=self.generate({'comparisons':[comparison],'next_step_indexes':[0]},'assessment');self.assertEqual(len(result['comparisons']),1);self.assertTrue(result['next_steps'])
         for bad in [{**comparison,'citations':['R1','R1']},{**comparison,'quotes':['invented passage','different display name']},{**comparison,'explanation':'There are 9999 publications.'}]:

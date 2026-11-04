@@ -5,7 +5,7 @@ import re
 import time
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler
 from discovery_tools import query_plan,research_plan,public_url
-from evidence_quality import ranked_ai_records
+from evidence_quality import ranked_ai_records,evidence_gate
 from profile_registry import url_tokens
 from ai_evidence import selections,independent
 from run_control import timeout,RunStopped
@@ -48,7 +48,11 @@ class LocalDrafts:
         if mode=='planning':
             novel=[q for q in plan if q['reason'] in ('name and supplied handle co-occurrence','handle and supplied location co-occurrence','analyst-approved name spelling variant')]
             if novel:plan=novel
-        records=[{'id':r['id'],'title':r.get('title','')[:300],'excerpt':r.get('detail','')[:1500],'reference':r.get('reference','')} for r in ranked_ai_records((run or {}).get('records',[]))[:12]]
+        raw_records=(run or {}).get('records',[])
+        ranked=ranked_ai_records(raw_records,case)
+        filtered=[{'citation':r.get('id'),'reason':evidence_gate(r,case)['reason']} for r in raw_records if not evidence_gate(r,case)['eligible']]
+        if isinstance(run,dict):run['ai']['phases'][-1]['context_filter']={'input_records':len(raw_records),'eligible_records':len(ranked),'selected_records':min(12,len(ranked)),'deduplicated_records':len(raw_records)-len(filtered)-len(ranked),'omitted':filtered[:100]}
+        records=[{'id':r['id'],'title':r.get('title','')[:300],'excerpt':r.get('detail','')[:1500],'reference':r.get('reference','')} for r in ranked[:12]]
         spans,links=selections(records)
         if mode in ('summary','leads','synthesis','assessment') and not records:
             return {'mode':mode,'draft':True,'claims':[],'leads':[],'comparisons':[],'next_steps':[],'notice':'No eligible cited evidence; no model call made.'}
@@ -94,7 +98,11 @@ class LocalDrafts:
         if isinstance(run,dict):run['ai']['phases'][-1]['output_keys']=sorted(result)
         from ai_evidence import validate
         from research_workflow import NEXT_STEPS
-        return validate(result,mode,records,plan,spans,links,NEXT_STEPS)
+        output=validate(result,mode,records,plan,spans,links,NEXT_STEPS)
+        for claim in output.get('claims',[]):
+            row=next(r for r in raw_records if r['id']==claim['citation']);gate=evidence_gate(row,case)
+            claim['relevance_note']=gate['reason'];claim['evidence_strength']='name-only' if gate['strength']==1 else 'analyst-confirmed' if gate['strength']==4 else 'supplied-identifier'
+        return output
 
 
 

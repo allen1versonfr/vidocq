@@ -3,7 +3,7 @@ import re
 from urllib.parse import urlparse,urlunparse,parse_qsl,urlencode
 
 HOST_ALIASES={'www.'+h:h for h in ('instagram.com','tiktok.com','vsco.co','twitch.tv','github.com','gitlab.com','reddit.com','youtube.com','steamcommunity.com','medium.com','pinterest.com','x.com','twitter.com','last.fm','wattpad.com')}
-HOST_ALIASES.update({'twitter.com':'x.com','www.twitter.com':'x.com','m.instagram.com':'instagram.com','m.tiktok.com':'tiktok.com','m.youtube.com':'youtube.com','old.reddit.com':'reddit.com'})
+HOST_ALIASES.update({'twitter.com':'x.com','www.twitter.com':'x.com','m.instagram.com':'instagram.com','m.tiktok.com':'tiktok.com','m.youtube.com':'youtube.com','old.reddit.com':'reddit.com','www.linkedin.com':'linkedin.com','www.hudl.com':'hudl.com'})
 PROFILE_HOSTS=set(HOST_ALIASES.values())|{'open.spotify.com'}
 NAVIGATION={
  'instagram.com':{'p','reel','reels','stories','explore','accounts','direct','about','legal','developer','search','challenge','web'},
@@ -50,9 +50,22 @@ def account_identity(value):
         if len(parts)==2 and parts[0]=='user' and re.fullmatch(r'[A-Za-z0-9_.-]{1,64}',parts[1]):handle=parts[1];prefix='user/'
     elif host=='open.spotify.com':
         if len(parts)==2 and parts[0]=='user' and re.fullmatch(r'[A-Za-z0-9_-]{1,64}',parts[1]):handle=parts[1];prefix='user/';case_sensitive=True
+    elif host=='linkedin.com':
+        if len(parts)==2 and parts[0]=='in' and re.fullmatch(r'[A-Za-z0-9_-]{1,120}',parts[1]):handle=parts[1];prefix='in/'
+    elif host=='hudl.com':
+        if len(parts) in (2,3) and parts[0]=='profile' and re.fullmatch(r'[0-9]{1,20}',parts[1]) and (len(parts)==2 or re.fullmatch(r'[A-Za-z0-9_-]{1,120}',parts[2])):handle=parts[1];prefix='profile/'
     if handle is None:return None
     if not case_sensitive:handle=handle.lower()
-    return {'platform':platform,'handle':handle,'reference':'https://'+host+'/'+prefix+handle,'lookup_kind':{'instagram.com':'instagram','tiktok.com':'tiktok','vsco.co':'vsco','steamcommunity.com':'steam'}.get(host,'username'),'ownership_verified':False}
+    return {'platform':platform,'handle':handle,'reference':'https://'+host+'/'+prefix+handle,'lookup_kind':{'instagram.com':'instagram','tiktok.com':'tiktok','vsco.co':'vsco','steamcommunity.com':'steam','linkedin.com':'reference','hudl.com':'reference'}.get(host,'username'),'ownership_verified':False}
+
+def content_account_reference(value):
+    """An explicit author path is a review lead, never a rewritten content URL."""
+    try:p=parsed_public(value)
+    except ValueError:return None
+    host=HOST_ALIASES.get(p.hostname,p.hostname);parts=p.path.strip('/').split('/')
+    if host=='tiktok.com' and len(parts)==3 and parts[1]=='video' and parts[2].isdigit():return account_identity('https://tiktok.com/'+parts[0])
+    if host=='x.com' and len(parts)==3 and parts[1]=='status' and parts[2].isdigit():return account_identity('https://x.com/'+parts[0])
+    return None
 
 def canonical_reference(value):
     p=parsed_public(value);identity=account_identity(value)

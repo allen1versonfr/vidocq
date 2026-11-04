@@ -17,7 +17,7 @@ The managed adapter retains its existing public-profile privacy checks and finit
 
 ## Broader search without depending on one index
 
-Search connection now offers Serper and SerpApi Google-result adapters in addition to free Mwmbl and optional Brave. Supply your own key, select a session request cap (1–100), and optionally save the new provider's key with Windows encryption. Review the provider's current free allowance, quotas and charges. Vidocq does not purchase credits or silently switch providers. Setup sends no subject searches; case execution still requires approval.
+Search connection now offers Serper and SerpApi Google-result adapters in addition to free Mwmbl and optional Brave. Supply your own key, select a session request cap (1–100), and save the provider's key with Windows encryption by default (uncheck Save for session-only use). Review the provider's current free allowance, quotas and charges. Vidocq does not purchase credits or silently switch providers. Setup sends no subject searches; case execution still requires approval.
 
 Keys never appear in status/report URLs or exported evidence. Serper sends its key to its fixed HTTPS API in a header. SerpApi's required request key is omitted from report/source URLs and error messages. Redirects are refused, system proxies are disabled for these two adapters, responses are bounded, repeated queries are cached briefly, and rate/quota failures are not converted into empty results. Saved keys/preferences survive executable updates and are included in scoped cleanup. These adapters retrieve index snippets, not original result pages.
 

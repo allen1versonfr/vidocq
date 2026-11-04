@@ -109,12 +109,13 @@ class PersistenceTests(unittest.TestCase):
         if os.name!='nt':self.skipTest('Windows DPAPI')
         with tempfile.TemporaryDirectory() as temp:
             web=WebSearch();setup=AutomationSetup(temp,web,MagicMock(),MagicMock(),MagicMock())
-            setup.search({'provider':'brave','key':'synthetic-brave-key','enabled':True})
+            setup.search({'provider':'brave','key':'synthetic-brave-key','enabled':True,'brave_result_limit':20})
             self.assertNotIn(b'synthetic-brave-key',Path(temp,'credentials.dpapi').read_bytes())
             restored=WebSearch();other=AutomationSetup(temp,restored,MagicMock(),MagicMock(),MagicMock());other.choices['mwmbl']=True
             with patch('web_search.build_opener') as network:other._start();network.assert_not_called()
             self.assertEqual(restored.provider,'brave');self.assertTrue(restored.enabled)
             self.assertEqual(restored.key,'synthetic-brave-key');self.assertTrue(other.search_status()['key_saved'])
+            self.assertEqual(restored.brave_result_limit,20)
             other.search({'provider':'mwmbl','enabled':True,'remember':False});self.assertEqual(other.search_status()['next_start_provider'],'brave')
             other.search({'provider':'brave','key':'','enabled':False,'forget_saved':True})
             self.assertFalse(other.search_path.exists());self.assertEqual(other.vault.search_key('brave'),'')

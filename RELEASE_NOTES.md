@@ -1,3 +1,17 @@
+# Vidocq 2.19.0
+
+Twelve changes target discovery coverage and evidence quality. Directory/property listings no longer enter model evidence or automatic clue expansion; raw records remain reviewable. Model context must match supplied identifiers, complete names, account references or analyst-confirmed evidence. Name-only quotation drafts warn about namesakes, and syndicated identical excerpts cannot fill multiple context slots.
+
+The engine skips equivalent context/AI queries and records the reason. Adaptive runs can spend remaining approved budget on platform-specific indexed searches, balancing supplied handles and name tokens. The platform-query limit is configurable from zero to eight, default four; total search/request/deadline limits still apply. Indexed TikTok/X content author paths become separate unverified profile leads with parent citations, preserving the original content URL. LinkedIn and Hudl profiles use exact-reference followups rather than fabricated usernames.
+
+Search connection adds optional 20-result Brave retrieval, preserving ranks beyond ten, depth-specific caches and saved settings. Ten remains the default. No pagination, credit purchase or authenticated social login is added. AI phases and report exports expose filtering, duplicates and query-efficiency details.
+
+Validation: 327 Python tests pass locally (one Windows symlink-capability skip), with synthetic source/relevance, platform-budget, provenance, namesake-label, query/cache and deep-rank regressions. DOM settings fixtures pass. Real local Qwen synthetic planning, abstention, quoted extraction and finite next actions returned valid outputs. Windows release gates repeat the suite and packaged update/recovery checks, including saved result-depth restoration.
+
+No new paid or private-person searches were run for this update. Discovery-score improvements remain unmeasured. Private fixtures/results are excluded from GitHub. Native visual QA and live operator Instagram login are not claimed.
+
+Previous release:
+
 # Vidocq 2.18.1
 
 Fixes repeated Brave key entry after restart or update. Saving a search connection now retains its provider and API key using Windows DPAPI by default. The Save checkbox starts checked; uncheck it for a session-only connection. Clear saved connection removes the stored key. Keys remain outside the executable in the current Windows user's Vidocq data directory.

@@ -48,7 +48,7 @@ def check(request,root):
     get('/api/instagram-login/forget',{});assert not get('/api/instagram-login')['saved'];assert vault.search_key('serper')=='synthetic-frozen-search-key'
     get('/api/automation',{'consent':True});wait_setup()
     # Omit remember: the normal save action must persist Brave without a second opt-in.
-    state=get('/api/search-connection',{'provider':'brave','key':'synthetic-frozen-brave-key','enabled':False})
+    state=get('/api/search-connection',{'provider':'brave','key':'synthetic-frozen-brave-key','enabled':False,'brave_result_limit':20})
     assert state['key_saved'] and state['next_start_provider']=='brave'
     assert vault.search_key('brave')=='synthetic-frozen-brave-key'
     assert b'synthetic-frozen-brave-key' not in (root/'data/credentials.dpapi').read_bytes()

@@ -1,3 +1,7 @@
+# 2.19.0 — Discovery coverage and evidence relevance
+
+Adds source/relevance gates for AI drafts, name-only warnings, syndicated-excerpt deduplication, effective-query deduplication, bounded platform index coverage, explicit content-author review leads, LinkedIn/Hudl profile references and optional saved 20-result Brave depth. See [discovery improvements](docs/DISCOVERY_QUALITY.md) for behavior, limits and validation.
+
 # 2.18.1
 
 Search connections now save their provider/key with Windows encryption by default and restore after restart/update. Session-only remains explicit. Corrected the stale Brave memory-only hint and retained the current key when saving after a session key change. Added default-save, opt-out, key-rotation and actual updated-executable restore checks.

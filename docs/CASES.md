@@ -63,7 +63,7 @@ Exports contain the supplied identifiers and selected evidence. Cases, notes and
 
 ## Search connection and empty reports
 
-Version 2.6.0 can retrieve Brave index snippets for names, usernames, Instagram/TikTok/VSCO handles, emails and phones when you supply and enable your own API key in **Search connection**. Without it, those general web searches are not run. Wikipedia and news cover only some names. Brave may require payment-card signup and charges beyond its limited monthly credits; review the provider plan. Keys are held only in memory (or an environment variable managed by you), never in the case database. Original pages are not fetched.
+Enable free Mwmbl or configure your optional Brave/Serper/SerpApi connection for general web-index snippets. Wikipedia and news cover only some names. Paid providers use your own key and plan; review their current quotas and charges. Search keys save with Windows encryption by default and restore after restart/update; uncheck Save for session-only use. Keys are never placed in the case database. Original result pages are not fetched by index searches.
 
 A completed report means processing finished. Its outcome separately states whether online records were returned, sources failed, no search completed, or the completed indexes had no matches. Offline phone metadata is not an online match. Use **Check public sources** for canaries, then create a new report after fixing a connection; saved snapshots are immutable.
 
