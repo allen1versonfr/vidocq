@@ -47,4 +47,9 @@ def check(request,root):
     expired=get('/api/instagram-login');assert expired['needs_reconnect'] and not expired['connected'] and not get('/api/automation')['credentials']['saved']
     get('/api/instagram-login/forget',{});assert not get('/api/instagram-login')['saved'];assert vault.search_key('serper')=='synthetic-frozen-search-key'
     get('/api/automation',{'consent':True});wait_setup()
+    # Omit remember: the normal save action must persist Brave without a second opt-in.
+    state=get('/api/search-connection',{'provider':'brave','key':'synthetic-frozen-brave-key','enabled':False})
+    assert state['key_saved'] and state['next_start_provider']=='brave'
+    assert vault.search_key('brave')=='synthetic-frozen-brave-key'
+    assert b'synthetic-frozen-brave-key' not in (root/'data/credentials.dpapi').read_bytes()
     print('Frozen guided-session restore/forget, provider-key encryption, reviewed bio/ID/link graph and consented new-report continuation passed without Instagram login or paid queries.')

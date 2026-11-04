@@ -1,3 +1,13 @@
+# Vidocq 2.18.1
+
+Fixes repeated Brave key entry after restart or update. Saving a search connection now retains its provider and API key using Windows DPAPI by default. The Save checkbox starts checked; uncheck it for a session-only connection. Clear saved connection removes the stored key. Keys remain outside the executable in the current Windows user's Vidocq data directory.
+
+Saving without retyping a key now keeps the active key, including a recently changed session key, rather than reverting to an older stored key. The UI no longer incorrectly says Brave keys stay only in memory. Older versions that never saved a key cannot recover it after exit; enter it once in this version to retain it going forward.
+
+Validation: 310 Python tests pass locally (one Windows symlink-capability skip), including real Windows DPAPI restart, explicit session-only and key-rotation regressions. DOM fixtures verify persistence is checked by default. Windows release checks also verify a fresh updated executable restores the encrypted Brave key and disabled preference without provider requests.
+
+Previous release:
+
 # Vidocq 2.18.0
 
 Repairs account/URL identity matching, supported-clue scheduling, canonicalization and report failure handling. A shared platform registry recognizes public profile shapes and aliases; supplied profiles, rediscoveries and new candidates are counted separately. Retrieval ranks, cache use and source observations survive into reports.

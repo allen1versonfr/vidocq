@@ -27,7 +27,7 @@ This release repairs the demonstrated identity, scheduling, evidence and reliabi
 
 ## Operator changes
 
-In Search connection, choose Brave and check the save option to retain the key using Windows DPAPI. A session-only key still disappears at restart. The next-start provider is shown explicitly. Research settings cannot be changed while a report is active.
+Since 2.18.1, Search connection saves the provider and key using Windows DPAPI by default. Uncheck Save for a session-only connection; a session-only key disappears at restart. Clear saved connection removes the stored key. Older memory-only versions require entering the key once after upgrading. The next-start provider is shown explicitly. Research settings cannot be changed while a report is active.
 
 Assisted cases expose a total time limit and an external request cap per provider. Ongoing work is bounded and partial evidence survives interruption; collector backends have separate operation caps. These controls do not change provider billing settings.
 
