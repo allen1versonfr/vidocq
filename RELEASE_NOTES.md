@@ -6,7 +6,7 @@ The engine skips equivalent context/AI queries and records the reason. Adaptive 
 
 Search connection adds optional 20-result Brave retrieval, preserving ranks beyond ten, depth-specific caches and saved settings. Ten remains the default. No pagination, credit purchase or authenticated social login is added. AI phases and report exports expose filtering, duplicates and query-efficiency details. Terminal report status now waits for final ledger persistence and settings-lock release, correcting a completion race caught by the packaged gate.
 
-Validation: 328 Python tests pass locally (one Windows symlink-capability skip), with synthetic source/relevance, platform-budget, provenance, namesake-label, query/cache and deep-rank regressions. DOM settings fixtures pass. Real local Qwen synthetic planning, abstention, quoted extraction and finite next actions returned valid outputs. Windows release gates repeat the suite and packaged update/recovery checks, including saved result-depth restoration.
+Validation: 329 Python tests pass locally (one Windows symlink-capability skip), with synthetic source/relevance, platform-budget, provenance, namesake-label, query/cache and deep-rank regressions. DOM settings fixtures pass. Real local Qwen synthetic planning, abstention, quoted extraction and finite next actions returned valid outputs. Windows release gates repeat the suite and packaged update/recovery checks, including saved result-depth restoration.
 
 No new paid or private-person searches were run for this update. Discovery-score improvements remain unmeasured. Private fixtures/results are excluded from GitHub. Native visual QA and live operator Instagram login are not claimed.
 

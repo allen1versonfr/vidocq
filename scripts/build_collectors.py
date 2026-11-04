@@ -10,6 +10,16 @@ SOURCES={
 EXTRAS=['pyinstaller==6.20.0','hikerapi==1.8.1','geopy==2.4.1','requests==2.32.5','tld==0.13.1','PySocks==1.7.1']
 
 def run(command,**kwargs):subprocess.run([str(x) for x in command],check=True,cwd=ROOT,**kwargs)
+
+def freeze(command,kind,work):
+ log=work/(kind+'-build.log')
+ # Parallel --clean invocations must never clean one another's cache.
+ env=dict(os.environ,PYINSTALLER_CONFIG_DIR=str(work/'pyinstaller-cache'/kind))
+ try:
+  with log.open('w',encoding='utf-8') as stream:run(command,stdout=stream,stderr=subprocess.STDOUT,env=env)
+ except subprocess.CalledProcessError:
+  print(kind+' build failed; final log output:\n'+log.read_text(encoding='utf-8',errors='replace')[-12000:],file=sys.stderr,flush=True)
+  raise
 def main():
  parser=argparse.ArgumentParser();parser.add_argument('--skip-sync',action='store_true');args=parser.parse_args()
  if sys.version_info[:2]!=(3,14):raise ValueError('Build companions with Python 3.14; the Vidocq app remains on 3.12.')
@@ -41,9 +51,8 @@ def main():
   if kind=='harvester':options=['--collect-all','theHarvester','--hidden-import','sqlalchemy.dialects.sqlite.aiosqlite','--collect-all','aiosqlite','--collect-all','greenlet']
   elif kind=='osintgram':options=['--paths',str(work/'osintgram-source'),'--collect-all','hikerapi','--collect-all','geopy','--collect-all','instagrapi','--collect-all','curl_cffi']
   else:options=['--paths',str(work/'photon-source'),'--collect-all','core','--collect-all','plugins','--collect-all','tld','--add-data',str(work/'photon-source')+';photon']
-  log=work/(kind+'-build.log')
   build_python=work/'osintgram-env/Scripts/python.exe' if kind=='osintgram' else python
-  with log.open('w',encoding='utf-8') as stream:run([build_python,'-m','PyInstaller','--noconfirm','--clean','--onefile','--console','--name',kind,'--distpath',out,'--workpath',ROOT/'build/companion-work'/kind,'--specpath',ROOT/'build/companion-specs',*options,ROOT/'scripts'/(kind+'_companion.py')],stdout=stream,stderr=subprocess.STDOUT)
+  freeze([build_python,'-m','PyInstaller','--noconfirm','--clean','--onefile','--console','--name',kind,'--distpath',out,'--workpath',ROOT/'build/companion-work'/kind,'--specpath',ROOT/'build/companion-specs',*options,ROOT/'scripts'/(kind+'_companion.py')],kind,work)
   exe=out/(kind+'.exe');return kind,{'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'size':exe.stat().st_size,'commit':SOURCES[kind][1]}
  with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:manifest=dict(pool.map(build,SOURCES))
  (out/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
