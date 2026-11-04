@@ -44,7 +44,7 @@ The optional Community Ban List switch queries only `https://communitybanlist.co
 
 ## Osintgram connection
 
-The Windows release includes a separately executed pinned [Datalux/Osintgram](https://github.com/Datalux/Osintgram) GPL-3.0 companion. Use Automatic setup and enter your HikerAPI key in Vidocq; it is saved with Windows encryption. Provider charges and access limits apply. No subject or Instagram password is requested. Corresponding source accompanies the release. An existing external Osintgram API remains an advanced alternative.
+The Windows release includes a separately executed pinned [Datalux/Osintgram](https://github.com/Datalux/Osintgram) GPL-3.0 companion. Use guided operator login or enter your optional HikerAPI key in Vidocq; sessions/keys are saved with Windows encryption. Provider charges and access limits apply. Guided login uses your own operator account; no subject password is required. The operator password is not saved. Corresponding source accompanies the release. An existing external Osintgram API remains an advanced alternative.
 
 Optional external setup, not needed for the managed Windows path:
 

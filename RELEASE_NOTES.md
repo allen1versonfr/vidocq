@@ -1,3 +1,17 @@
+# Vidocq 2.17.0 - Guided operator login and broader research
+
+- Included instagrapi 3.2.2 operator login, 2FA, encrypted saved sessions, cancel/forget and explicit reconnect. No OAuth claim or silent reauthentication during target lookups.
+- Optional Serper/SerpApi Google-result adapters with encrypted remembered keys, session request caps, bounded responses/cache and explicit quota/error handling. No automatic paid fallback.
+- Reviewed public bios, explicit links and platform-scoped stable IDs; separately approved one-page metadata capture and cited profile graphs without automatic ownership confirmation.
+- Opted-in empty-result query variations inside case budgets, using only supplied clues/approved spellings.
+- Guided browser review and continuation into a new immutable report with a fresh approved budget.
+- Local AI source-quoted comparisons and finite next-evidence proposals; boilerplate ownership cautions do not count as substantive synthesis.
+- Dated positive AND negative checker controls to clear quarantine, with recent outcome history and response/checker fingerprints.
+
+[Setup and limits](docs/GUIDED_INSTAGRAM_LOGIN.md). Supply your own operator credentials/2FA or provider key inside Vidocq. Login/security notices can reach the operator account. No live Instagram login or paid-provider accuracy guarantee is implied by synthetic tests. Private-person benchmark data is excluded.
+
+## Previous release
+
 # Vidocq 2.16.0 - Managed tools and evidence-driven AI
 
 - Included pinned theHarvester, Photon and Osintgram companions, alongside Maigret. One setup panel enables free Mwmbl and remembers local-service startup choices; setup runs no target queries.

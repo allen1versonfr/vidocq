@@ -10,7 +10,7 @@ import tempfile
 import time
 import threading
 
-OWNED_FILES=('workspace.sqlite3','workspace.sqlite3-wal','workspace.sqlite3-shm','workspace.sqlite3-journal','startup.log','update-result.json','.vidocq-owner.json','local-ai.json','local-ai.json.part','credentials.dpapi','credentials.dpapi.part','automations.json','automations.json.part','browser-relay.json','checker-health.json')
+OWNED_FILES=('workspace.sqlite3','workspace.sqlite3-wal','workspace.sqlite3-shm','workspace.sqlite3-journal','startup.log','update-result.json','.vidocq-owner.json','local-ai.json','local-ai.json.part','credentials.dpapi','credentials.dpapi.part','automations.json','automations.json.part','browser-relay.json','checker-health.json','checker-health.json.part','search-connection.json','search-connection.json.part')
 
 def owned_files(root):
     from managed_local_ai import owned_ai_files

@@ -1,8 +1,8 @@
 # Additional investigation sources
 
-**Version 2.16:** the Windows release includes managed theHarvester, Photon and Osintgram services, saved setup choices, a native reviewed-browser relay and an active bounded AI case pipeline. Start with [Automatic setup](AUTOMATED_SETUP.md); manual-service instructions below remain optional alternatives.
+**Version 2.17:** the Windows release includes managed theHarvester, Photon and Osintgram services, saved setup choices, a native reviewed-browser relay and an active bounded AI case pipeline. Start with [Automatic setup](AUTOMATED_SETUP.md); manual-service instructions below remain optional alternatives.
 
-Configure these optional connections in Search connection, then allow each source in the case. Existing cases keep them off. Manually entered HIBP/collector keys stay in memory and are excluded from reports and backups. Managed local tokens are regenerated on startup. The Osintgram provider key is separately encrypted and retained as described in the setup guide. Standalone lookups are also available.
+Configure these optional connections in Search connection, then allow each source in the case. Existing cases keep them off. Manually entered HIBP/collector keys stay in memory and are excluded from reports and backups. Managed local tokens are regenerated on startup. Osintgram operator sessions/provider keys and optional Serper/SerpApi keys can be encrypted and retained as described in the [guided setup guide](GUIDED_INSTAGRAM_LOGIN.md). Standalone lookups are also available.
 
 ## Have I Been Pwned
 

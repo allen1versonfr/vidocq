@@ -41,6 +41,8 @@ LOCAL_DRAFTS.manager=LOCAL_AI
 from automation_setup import AutomationSetup
 from browser_bridge import BrowserBridge,parse_capture,register as register_browser,unregister as unregister_browser
 AUTOMATION=AutomationSetup(DATA,WEB_SEARCH,COLLECTORS,CONNECTORS,LOCAL_AI)
+from instagram_login import InstagramLogin
+INSTAGRAM_LOGIN=InstagramLogin(AUTOMATION)
 BROWSER_BRIDGE=BrowserBridge(DATA)
 from checker_health import CheckerHealth
 CHECKER_HEALTH=CheckerHealth(DATA,COLLECTORS)
@@ -318,6 +320,8 @@ class Handler(BaseHTTPRequestHandler):
         if route=='/api/local-drafts':return self.send(200,LOCAL_DRAFTS.status())
         if route=='/api/local-ai':return self.send(200,LOCAL_AI.status())
         if route=='/api/automation':return self.send(200,AUTOMATION.status())
+        if route=='/research-workflow.js':return self.send(200,(ROOT/'ui/research-workflow.js').read_bytes(),'application/javascript; charset=utf-8')
+        if route=='/api/instagram-login':return self.send(200,INSTAGRAM_LOGIN.status())
         if route=='/api/automation/licenses':return self.send(200,{'text':(AUTOMATION.manager.bundle/'LICENSES.txt').read_text(encoding='utf-8')})
         if route=='/api/checker-controls':return self.send(200,CHECKER_HEALTH.status())
         if route=='/automation.js':return self.send(200,(ROOT/'ui/automation.js').read_bytes(),'application/javascript; charset=utf-8')
@@ -387,6 +391,21 @@ class Handler(BaseHTTPRequestHandler):
             p=json.loads(self.rfile.read(size))
             if not isinstance(p,dict):raise ValueError('Invalid request.')
             if BURN.pending:return self.send(409,{'error':'Vidocq burn is pending; new writes are disabled.'})
+            login=re.fullmatch(r'/api/instagram-login/(start|code|cancel|forget)',self.path)
+            if login:
+                if CASES.active:raise ValueError('Finish or cancel the current case before changing the operator login.')
+                return self.send(200,INSTAGRAM_LOGIN.action(login[1],p))
+            workflow=re.fullmatch(r'/api/cases/([0-9a-f]{24})/(review-plan|profile-capture|continue)',self.path)
+            if workflow:
+                key,action=workflow.groups();case=CASES.get(key)
+                if action=='review-plan':
+                    from research_workflow import review_plan
+                    runs=CASES.runs(key);return self.send(200,review_plan(case,runs[0] if runs else None))
+                if action=='continue':return self.send(202,CASES.start(key,p.get('consent'),p.get('previous_run')))
+                from profile_evidence import reviewed_profile,capture_profile
+                result=capture_profile(p) if p.get('mode')=='public-fetch' else reviewed_profile(p)
+                finding=CASES.link_capture(key,result,INVESTIGATION.save_finding)
+                return self.send(201,{'result':result,'evidence':finding})
             if self.path=='/api/automation':
                 if CASES.active:raise ValueError('Finish or cancel the active case before changing tool setup.')
                 result=AUTOMATION.apply(p)
@@ -396,7 +415,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send(202,AUTOMATION.status())
             if self.path=='/api/automation/credentials':
                 if CASES.active:raise ValueError('Finish or cancel the active case before changing credentials.')
-                return self.send(200,AUTOMATION.credentials(p))
+                with INSTAGRAM_LOGIN.lock:return self.send(200,AUTOMATION.credentials(p))
             if self.path=='/api/checker-controls':
                 if CASES.active:raise ValueError('Finish the active investigation before validating a checker.')
                 return self.send(200,CHECKER_HEALTH.run(p))
@@ -487,7 +506,7 @@ class Handler(BaseHTTPRequestHandler):
                 probes=[('Wikipedia (public canary)',encyclopedia,'Ada Lovelace'),('Registry (public canary)',network_registry,'8.8.8.8')]
                 with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(lambda x:run_adapter(*x),probes))
                 return self.send(200,{'probes':results,'web_search':WEB_SEARCH.status(),'notice':'Public canary queries only; no case identifiers were sent.'})
-            if self.path=='/api/search-connection':return self.send(200,WEB_SEARCH.configure(p))
+            if self.path=='/api/search-connection':return self.send(200,AUTOMATION.search(p))
             if self.path=='/api/phone':
                 from phone_lookup import inspect_phone
                 return self.send(200,inspect_phone(p.get('value',''),p.get('region','US')))

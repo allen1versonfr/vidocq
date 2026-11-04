@@ -47,7 +47,7 @@ class BurnTests(unittest.TestCase):
             with self.assertRaises(ValueError):self.manager.preview(True)
     @unittest.skipUnless(os.name=='nt','Windows helper')
     def test_companion_artifacts_and_credentials_removed_unknown_files_preserved(self):
-        owned=[self.root/'credentials.dpapi',self.root/'automations.json',self.root/'browser-relay.json',self.root/'checker-health.json',self.root/'harvester/runs.sqlite',self.root/'harvester/run-artifacts/12345678-1234-1234-1234-123456789abc/evidence.json']
+        owned=[self.root/'credentials.dpapi',self.root/'automations.json',self.root/'browser-relay.json',self.root/'checker-health.json',self.root/'checker-health.json.part',self.root/'search-connection.json',self.root/'search-connection.json.part',self.root/'harvester/runs.sqlite',self.root/'harvester/run-artifacts/12345678-1234-1234-1234-123456789abc/evidence.json']
         for path in owned:path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'synthetic local state')
         unknown=self.root/'harvester/run-artifacts/12345678-1234-1234-1234-123456789abc/notes.txt';unknown.write_text('Preserve')
         plan=self.manager.preview();paths={Path(f['path']).resolve() for f in plan['files']}

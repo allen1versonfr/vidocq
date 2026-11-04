@@ -28,11 +28,14 @@ def report_sections(run):
     sections.append(('Published links and imported leads', ['['+x['citation']+'] '+x['source']+' → '+x['target']+' · '+x['relation']+' · '+x['observed_at'] for x in run.get('link_evidence',[])] or ['No captured link evidence.']))
     sections.append(('Historical aliases (supplied, unverified)',[json.dumps(x,ensure_ascii=False) for x in run['case'].get('aliases',[])] or ['None supplied.']))
     if run.get('coverage_assessment'):sections.append(('Investigation coverage',[json.dumps(run['coverage_assessment'],ensure_ascii=False)]))
+    if run.get('profile_graph'):sections.append(('Public profile observations and links',[json.dumps(run['profile_graph'],ensure_ascii=False)]))
+    if run.get('query_variations'):sections.append(('Empty-result query variations',[json.dumps(x,ensure_ascii=False) for x in run['query_variations']]))
     ai=run.get('ai',{})
     if ai.get('enabled'):
         lines=['Local AI added '+str(ai.get('executed_queries',0))+' attempted search tasks. Model-written findings remain review drafts, never ownership confirmation.']+ai.get('errors',[])
         for claim in (ai.get('summary') or {}).get('claims',[]):lines.append('['+claim['citation']+'] '+claim.get('text','Source excerpt')+' · Supporting quotation: '+claim['quote'])
         sections.append(('AI-assisted findings — review draft',lines))
+        if ai.get('assessment'):sections.append(('AI comparison and next evidence — review draft',[json.dumps(ai['assessment'],ensure_ascii=False)]))
     return sections
 
 def report_analysis_html(run):
@@ -46,10 +49,10 @@ def options(value):
     if value is None:value={}
     if not isinstance(value,dict):raise ValueError('Invalid investigation settings.')
     result={}
-    for field,default in [('enabled',False),('follow_clues',True),('direct_sources',False),('allow_hibp',False),('allow_harvester',False),('allow_maigret',False),('ai_assisted',False),('follow_published_links',False)]:
+    for field,default in [('enabled',False),('follow_clues',True),('direct_sources',False),('allow_hibp',False),('allow_harvester',False),('allow_maigret',False),('ai_assisted',False),('follow_published_links',False),('adaptive_queries',False),('ai_assessment',True)]:
         result[field]=value.get(field,default)
         if type(result[field]) is not bool:raise ValueError('Invalid investigation setting: '+field)
-    for field,default,low,high in [('max_searches',25,1,40),('max_followups',5,0,10),('depth',1,0,2),('ai_searches',4,0,8)]:
+    for field,default,low,high in [('max_searches',25,1,40),('max_followups',5,0,10),('depth',1,0,2),('ai_searches',4,0,8),('adaptive_searches',3,0,6)]:
         number=value.get(field,default)
         if type(number) is not int or not low<=number<=high:raise ValueError('Investigation '+field+' is outside its allowed range.')
         result[field]=number
@@ -140,6 +143,9 @@ def execute(service,run):
     from case_reports import now, safe_reference
     from web_search import outcome
     case=run['case'];opts=options(case.get('investigation'));queue=deque();seen=set();records={};followups=0
+    from research_workflow import variations
+    from profile_evidence import profile_graph
+    query_variants=deque(variations(case));run['query_variations']=[]
     cancelled=service.cancel_flags[run['id']];collector_attempts=set()
     run.update(status='running',completed=0,total=0,message='Building the investigation plan…',discovered_clues=[],search_log=[],discovery_links=[])
     def enqueue(kind,value,depth=0,parent=None,origin='supplied'):
@@ -159,7 +165,7 @@ def execute(service,run):
         if variant['reason'] not in ('supplied full name','supplied username','supplied location variant','supplied employer context'):
             enqueue('context',variant['terms'],origin=variant['reason'])
     run['query_plan']=query_plan(case);run['link_evidence']=[]
-    run['ai']={'enabled':opts['ai_assisted'],'planned_queries':[],'executed_queries':0,'errors':[],'summary':None,'proposed_links':[]}
+    run['ai']={'enabled':opts['ai_assisted'],'planned_queries':[],'executed_queries':0,'errors':[],'summary':None,'proposed_links':[],'assessment':None}
     if opts['ai_assisted']:
         try:
             if service.llm is None:raise ValueError('Local AI is not connected. Finish local model setup before an AI-assisted case.')
@@ -195,6 +201,7 @@ def execute(service,run):
         if capture.get('origin')=='public-links':
             try:
                 imported=json.loads(capture.get('excerpt','{}'))
+                if isinstance(imported,dict) and isinstance(imported.get('profile'),dict):entry.setdefault('observations',{})['profile']=imported['profile']
                 edges=imported.get('edges',[]) if isinstance(imported,dict) else []
                 if not isinstance(edges,list):edges=[]
                 for edge in edges[:300]:
@@ -202,18 +209,18 @@ def execute(service,run):
                     if edge['relation'] not in ('published-link','browser-captured-link','photon-aggregate-lead') or not safe_reference(edge['source']) or not safe_reference(edge['target']):continue
                     run['link_evidence'].append(dict(edge,citation=entry['id'],source_analyst_status=entry.get('analyst_status','Unverified'),target_rejected_by_analyst=rejected(case,edge.get('target','')),ownership_verified=False))
             except (ValueError,TypeError):pass
-    def published_link(url,parent,origin):
+    def published_link(url,parent,origin,depth=1):
         nonlocal followups
-        if not opts['follow_published_links'] or not opts['follow_clues'] or opts['depth']<1 or rejected(case,url):return
+        if not opts['follow_published_links'] or not opts['follow_clues'] or depth>opts['depth'] or rejected(case,url):return
         for clue in extract_clues(url,service.normalize):
             # Explicit public profile links only; do not widen to an entire shared platform.
             if clue['kind'] not in ('username','instagram','tiktok','vsco','steam'):continue
             if followups>=opts['max_followups'] or len(queue)+run['completed']>=opts['max_searches']:return
-            if enqueue(clue['kind'],clue['value'],1,parent,origin):
+            if enqueue(clue['kind'],clue['value'],depth,parent,origin):
                 queue[-1]['linked_reference']=url
                 host=(urlparse(url).hostname or '').removeprefix('www.')
                 queue[-1]['site_scope']={'github.com':'GitHub','gitlab.com':'GitLab','reddit.com':'Reddit','twitch.tv':'Twitch','tiktok.com':'TikTok','instagram.com':'Instagram','vsco.co':'VSCO','pinterest.com':'Pinterest','medium.com':'Medium'}.get(host)
-                followups+=1;run['discovered_clues'].append(dict(clue,parent_citation=parent,depth=1,status='queued',reason='Explicit published link; ownership unverified.'))
+                followups+=1;run['discovered_clues'].append(dict(clue,parent_citation=parent,depth=depth,status='queued',reason='Explicit published link; ownership unverified.'))
     for edge in run['link_evidence']:
         if edge['relation'] in ('published-link','browser-captured-link') and edge.get('source_analyst_status')!='Rejected':published_link(edge['target'],edge['citation'],'approved-published-link')
     ai_links_done=False
@@ -225,7 +232,7 @@ def execute(service,run):
                     proposed=service.llm.generate(case,run,'leads',True);run['ai']['proposed_links']=proposed.get('leads',[])
                     for lead in run['ai']['proposed_links']:
                         source=next((r for r in records.values() if r['id']==lead['citation']),None)
-                        if source and source.get('analyst_status')!='Rejected' and lead['url'] in source['detail']:published_link(lead['url'],lead['citation'],'local-ai-cited-public-link')
+                        if source and source.get('analyst_status')!='Rejected' and lead['url'] in source['detail']:published_link(lead['url'],lead['citation'],'local-ai-cited-public-link',source.get('search_depth',0)+1)
                 except ValueError as e:run['ai']['errors'].append(str(e))
             if not queue:break
         task=queue.popleft();kind,value=task['kind'],task['value'];seed=kind+': '+(' + '.join(value) if isinstance(value,list) else value)
@@ -268,6 +275,15 @@ def execute(service,run):
                 for row in rows:
                     origin='offline-metadata' if label=='Offline phone metadata' else 'retrieved'
                     entry=record(label,provider.get('source',''),row,task,origin)
+                    profile=row.get('observations',{}).get('profile') if isinstance(row.get('observations'),dict) else None
+                    if profile and isinstance(profile,dict) and entry.get('analyst_status')!='Rejected':
+                        from profile_evidence import reviewed_profile
+                        try:
+                            observed=reviewed_profile({'consent':True,'public_reviewed':True,'reference':entry['reference'],'biography':profile.get('biography',''),'display_name':profile.get('display_name',''),'handle':profile.get('handle',''),'stable_id':profile.get('stable_id',''),'links':profile.get('links',[])})
+                            for edge in observed['edges']:
+                                edge.update(relation='published-link',citation=entry['id'],ownership_verified=False);run['link_evidence'].append(edge)
+                                published_link(edge['target'],entry['id'],'approved-published-link',task['depth']+1)
+                        except ValueError:pass
                     if task.get('parent_citation') and task['parent_citation']!=entry['id']:
                         run['discovery_links'].append({'from':task['parent_citation'],'to':entry['id'],'relation':'Follow-up search; identity not established'})
                         field=next((f for f,k in KINDS.items() if k==kind),None)
@@ -289,6 +305,11 @@ def execute(service,run):
                         run['discovered_clues'].append(clue)
                         if scheduled:enqueue(clue['kind'],clue['value'],clue['depth'],entry['id'],'discovered');followups+=1
                         else:seen.add(identity)
+        empty_index=any(p.get('status')=='empty' for result in reports for p in result.get('results',[]) if any(name in p.get('provider','') for name in ('Mwmbl','Brave','Serper','SerpApi')))
+        if opts['adaptive_queries'] and empty_index and task['depth']==0:
+            while query_variants and len(run['query_variations'])<opts['adaptive_searches'] and run['completed']+len(queue)+1<opts['max_searches']:
+                variant=query_variants.popleft()
+                if enqueue('context',variant['terms'],origin='empty-result-query-variation'):run['query_variations'].append(dict(variant,trigger=seed))
         run['completed']+=1
         run['search_log'].append(dict(task,status='completed',seed=seed))
         if task['origin']=='local-ai-approved-query-plan':run['ai']['executed_queries']+=1
@@ -302,9 +323,14 @@ def execute(service,run):
             clue['status']='attempted' if (clue['kind'],json.dumps(clue['value'],sort_keys=True).casefold()) in searched else 'not-searched'
             if clue['status']=='attempted':clue['reason']='Follow-up processing finished; see source coverage for successful requests, failures or missing connections.'
     run['records']=list(records.values());run['analysis']=synthesis(run)
+    run['profile_graph']=profile_graph(run['records'])
     if opts['ai_assisted'] and records and not cancelled.is_set():
         try:run['ai']['summary']=service.llm.generate(case,run,'synthesis',True)
         except ValueError as e:run['ai']['errors'].append(str(e))
+        if opts['ai_assessment']:
+            try:run['ai']['assessment']=service.llm.generate(case,run,'assessment',True)
+            except ValueError as e:run['ai']['errors'].append(str(e))
+    run['ai']['evidence_metrics']={'queries_attempted':run['ai']['executed_queries'],'source_quoted_drafts':len((run['ai']['summary'] or {}).get('claims',[])),'notice':'Draft counts do not measure new facts or account-discovery accuracy.'}
     incomplete=[c for c in run['coverage'] if c['status'] in ('partial','error','not-configured')]
     run['coverage_assessment']={'status':'incomplete' if incomplete or queue or run['ai']['errors'] else 'completed-for-selected-sources','source_gaps':len(incomplete),'unsearched_tasks':len(queue),'ai_gaps':len(run['ai']['errors']),'notice':'Completed processing does not mean complete internet coverage. Empty indexes, unavailable platforms and unverified identities remain limitations.'}
     result_code,message=outcome(run['coverage'],run['records'])

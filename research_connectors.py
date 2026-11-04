@@ -155,12 +155,15 @@ class ResearchConnectors:
             if run_id in self.cancelled_runs:raise ConnectorUnavailable('Osintgram run was cancelled before it started.')
         if not enabled:raise ConnectorUnavailable('Osintgram was not queried: enable the local Osintgram 2.x connection.')
         if self.managed_manager:
-            self.managed_key,port=self.managed_manager.ensure('osintgram',self.managed_vault.load());self.port=port
+            self.managed_key,port=self.managed_manager.ensure('osintgram',self.managed_vault.osintgram());self.port=port
         base='http://127.0.0.1:'+str(port)
         def local_request(path,payload=None,timeout=20):
             return read_json(base+path,payload,local=True,timeout=timeout,**({'local_key':self.managed_key} if self.managed_key else {}))
         about=local_request('/api/about')
         if not isinstance(about,dict) or about.get('repository')!='https://github.com/Datalux/Osintgram':raise ValueError('The selected local service does not identify itself as Osintgram 2.x.')
+        if about.get('needs_reconnect'):
+            if self.managed_vault:self.managed_vault.invalidate_instagram()
+            raise ConnectorUnavailable('Instagram session expired or was challenged. Reconnect explicitly in Search connection; no automatic login was attempted.')
         self._reserve('osintgram');job='vidocq-'+secrets.token_hex(12)
         with self.lock:self.pending[job]=(run_id,base)
         try:
@@ -187,10 +190,12 @@ class ResearchConnectors:
                     try:
                         additional=fetch_calls(extra,remaining)
                         data['tool_calls'].extend(additional['tool_calls'])
+                        data['needs_reconnect']=bool(data.get('needs_reconnect') or additional.get('needs_reconnect'))
                         if type(additional.get('api_calls_total')) is int:data['api_calls_total']=spent+additional['api_calls_total']
                     except ValueError:
                         self._cancel_job(base,job)
                         data['tool_calls'].extend({'name':c,'is_error':True,'vidocq_reason':'Extra Osintgram commands failed; the completed profile result was retained.'} for c in extra)
+            if data.get('needs_reconnect') and self.managed_vault:self.managed_vault.invalidate_instagram()
             results=[]
             for call in data['tool_calls']:
                 if not isinstance(call,dict) or call.get('name') not in commands:continue
@@ -209,11 +214,22 @@ class ResearchConnectors:
                 detail=json.dumps(value,ensure_ascii=False)
                 truncated=len(detail)>11000;detail=detail[:11000]
                 observations={'reported_name':value.get('full_name',''),'private_profile':value.get('is_private')} if name=='get_user_info' and isinstance(value,dict) else {}
+                if name=='get_user_info' and isinstance(value,dict):
+                    public_links=[]
+                    for link in ([value.get('external_url')] if value.get('external_url') else [])+(value.get('bio_links',[]) if isinstance(value.get('bio_links'),list) else []):
+                        url=link.get('url') if isinstance(link,dict) else link
+                        if isinstance(url,str) and url.startswith('https://'):public_links.append(url[:2000])
+                    observations['profile']={'platform':'instagram.com','handle':handle,'stable_id':str(value.get('id',''))[:128],'display_name':str(value.get('full_name',''))[:200],'biography':str(value.get('biography',''))[:6000],'links':public_links[:50]}
                 results.append({'provider':'Osintgram / '+name,'source':base+'/api/run','status':'ok' if value else 'empty','rows':[{'title':'Instagram @'+handle+' · '+name,'detail':detail+('\nResult truncated to report limit.' if truncated else '')+'\nPublic data via configured Osintgram backend. Relevance and ownership remain unverified.','reference':profile_reference('instagram',handle),'observations':observations,'identifiers':[{'kind':'instagram','value':handle}]}] if value else []})
             if not results:raise ValueError('Osintgram returned no recognized command results.')
             return {'results':results,'links':[],'backend_requests':data.get('api_calls_total')}
         except ValueError:
             self._cancel_job(base,job)
+            if self.managed_manager and self.managed_vault:
+                try:
+                    state=self.managed_manager.request('osintgram','/api/auth/status')
+                    if state.get('needs_reconnect'):self.managed_vault.invalidate_instagram()
+                except (ValueError,OSError):pass
             raise
         finally:
             with self.lock:self.pending.pop(job,None)

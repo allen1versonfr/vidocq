@@ -33,14 +33,17 @@ def main():
   env=dict(os.environ,UV_PROJECT_ENVIRONMENT=str(work/'harvester-env'))
   run([sys.executable,'-m','uv','sync','--frozen','--no-dev','--no-editable','--python',sys.executable,'--project',work/'harvester-source'],env=env)
   run([sys.executable,'-m','uv','pip','install','--python',work/'harvester-env/Scripts/python.exe',*EXTRAS])
+  if not (work/'osintgram-env/Scripts/python.exe').exists():run([sys.executable,'-m','uv','venv','--python',sys.executable,work/'osintgram-env'])
+  run([sys.executable,'-m','uv','pip','sync','--python',work/'osintgram-env/Scripts/python.exe','--require-hashes',ROOT/'scripts/osintgram-lock.txt'])
  python=work/'harvester-env/Scripts/python.exe'
  def build(kind):
   options=[]
   if kind=='harvester':options=['--collect-all','theHarvester','--hidden-import','sqlalchemy.dialects.sqlite.aiosqlite','--collect-all','aiosqlite','--collect-all','greenlet']
-  elif kind=='osintgram':options=['--paths',str(work/'osintgram-source'),'--collect-all','hikerapi','--collect-all','geopy']
+  elif kind=='osintgram':options=['--paths',str(work/'osintgram-source'),'--collect-all','hikerapi','--collect-all','geopy','--collect-all','instagrapi','--collect-all','curl_cffi']
   else:options=['--paths',str(work/'photon-source'),'--collect-all','core','--collect-all','plugins','--collect-all','tld','--add-data',str(work/'photon-source')+';photon']
   log=work/(kind+'-build.log')
-  with log.open('w',encoding='utf-8') as stream:run([python,'-m','PyInstaller','--noconfirm','--clean','--onefile','--console','--name',kind,'--distpath',out,'--workpath',ROOT/'build/companion-work'/kind,'--specpath',ROOT/'build/companion-specs',*options,ROOT/'scripts'/(kind+'_companion.py')],stdout=stream,stderr=subprocess.STDOUT)
+  build_python=work/'osintgram-env/Scripts/python.exe' if kind=='osintgram' else python
+  with log.open('w',encoding='utf-8') as stream:run([build_python,'-m','PyInstaller','--noconfirm','--clean','--onefile','--console','--name',kind,'--distpath',out,'--workpath',ROOT/'build/companion-work'/kind,'--specpath',ROOT/'build/companion-specs',*options,ROOT/'scripts'/(kind+'_companion.py')],stdout=stream,stderr=subprocess.STDOUT)
   exe=out/(kind+'.exe');return kind,{'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'size':exe.stat().st_size,'commit':SOURCES[kind][1]}
  with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:manifest=dict(pool.map(build,SOURCES))
  (out/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')
@@ -48,11 +51,14 @@ def main():
  for kind,(repo,commit,_) in SOURCES.items():
   license_file=work/(kind+'-source')/('LICENSE.md' if kind=='photon' else 'LICENSE')
   notices.append(kind+'\nhttps://github.com/'+repo+'/tree/'+commit+'\n\n'+license_file.read_text(encoding='utf-8'))
+ sdk_license=work/'osintgram-env/Lib/site-packages/instagrapi-3.2.2.dist-info/licenses/LICENSE'
+ notices.append('instagrapi 3.2.2\nhttps://github.com/subzeroid/instagrapi\n\n'+sdk_license.read_text(encoding='utf-8'))
  (out/'LICENSES.txt').write_text('\n\n'.join(notices),encoding='utf-8')
  dist=ROOT/'dist';dist.mkdir(exist_ok=True)
  with ZipFile(dist/'Collectors-Source.zip','w',ZIP_DEFLATED) as z:
   for kind in SOURCES:z.write(work/(kind+'-upstream.zip'),kind+'-source.zip')
-  for name in ['scripts/build_collectors.py','scripts/harvester_companion.py','scripts/osintgram_companion.py','scripts/photon_companion.py','scripts/collector_http.py','companion_scope.py','collector_policy.py','discovery_tools.py']:z.write(ROOT/name,name)
+  for name in ['scripts/build_collectors.py','scripts/harvester_companion.py','scripts/osintgram_companion.py','scripts/instagram_session.py','scripts/osintgram-requirements.in','scripts/osintgram-lock.txt','scripts/photon_companion.py','scripts/collector_http.py','companion_scope.py','collector_policy.py','discovery_tools.py']:z.write(ROOT/name,name)
+  z.write(out/'LICENSES.txt','LICENSES.txt')
   z.writestr('BUILD.txt','Python 3.14 on Windows x64. Run python scripts/build_collectors.py. Each upstream ZIP is pinned and verified; theHarvester dependencies use its frozen uv.lock. Extra build/service pins: '+', '.join(EXTRAS)+'\nNo browser binaries are installed. Separate companion executables communicate over loopback IPC.\n')
  print(json.dumps({'built':manifest,'source_asset':'Collectors-Source.zip'}),flush=True)
 if __name__=='__main__':main()

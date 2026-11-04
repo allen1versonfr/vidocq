@@ -2,7 +2,7 @@
 import argparse,hmac,json,os,threading
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 
-def serve(service,handler):
+def serve(service,handler,about=None):
     parser=argparse.ArgumentParser();parser.add_argument('--port',type=int,required=True);parser.add_argument('--data',required=True);args=parser.parse_args()
     key=os.environ.get('VIDOCQ_COMPANION_KEY','');lock=threading.Lock()
     if len(key)<20:raise ValueError('Missing companion authentication.')
@@ -13,7 +13,8 @@ def serve(service,handler):
         def allowed(self):return self.headers.get('Host')=='127.0.0.1:'+str(self.server.server_port) and hmac.compare_digest(self.headers.get('X-Vidocq-Key',''),key)
         def do_GET(self):
             if not self.allowed():return self.reply(401,{'error':'Authentication required.'})
-            if self.path=='/api/about':return self.reply(200,{'service':'vidocq-'+service,'protocol':1,**({'repository':'https://github.com/Datalux/Osintgram'} if service=='osintgram' else {})})
+            if self.path=='/api/about':return self.reply(200,{'service':'vidocq-'+service,'protocol':1,**({'repository':'https://github.com/Datalux/Osintgram'} if service=='osintgram' else {}),**(about() if about else {})})
+            if service=='osintgram' and self.path=='/api/auth/status':return self.reply(200,handler(self.path,{}))
             self.reply(404,{'error':'Unknown route.'})
         def do_POST(self):
             if not self.allowed():return self.reply(401,{'error':'Authentication required.'})
@@ -22,7 +23,7 @@ def serve(service,handler):
                 if not 1<=size<=200000:raise ValueError('Invalid request size.')
                 payload=json.loads(self.rfile.read(size))
                 if not isinstance(payload,dict):raise ValueError('Invalid request.')
-                if self.path=='/api/cancel':return self.reply(200,handler(self.path,payload))
+                if self.path=='/api/cancel' or (service=='osintgram' and self.path.startswith('/api/auth/')):return self.reply(200,handler(self.path,payload))
                 if not lock.acquire(blocking=False):return self.reply(409,{'error':'A collector job is already running.'})
                 try:result=handler(self.path,payload)
                 finally:lock.release()
