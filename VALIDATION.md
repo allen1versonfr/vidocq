@@ -1,3 +1,9 @@
+# Validation for Vidocq 2.18.1
+
+310 Python tests pass locally (one Windows symlink-capability skip). Real Windows DPAPI tests verify default Brave persistence across a fresh setup instance, no network calls during restore, explicit session-only storage avoidance, forgetting, and saving the active key after rotation. DOM fixtures verify that the persistence checkbox starts checked and instructions describe restart/update restoration. Release smoke checks start a fresh actually updated executable against preserved data and assert the encrypted Brave key and disabled preference restore without provider calls. No private-person or paid search queries are used.
+
+Previous validation:
+
 # Validation for Vidocq 2.18.0
 
 308 Python tests pass in the hash-locked Windows build environment (one Windows symlink-capability skip). Audit regressions cover profile/URL identity, clue scheduling, evidence selection, provider state and report robustness. Synthetic integration fixtures cover item-level AI rejection, run budgets/deadlines, configuration guards, persistence, nested restore validation and offline benchmark eligibility. Research UI DOM and browser-export fixtures pass. No native visual browser validation is claimed.

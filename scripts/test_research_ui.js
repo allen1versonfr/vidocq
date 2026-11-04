@@ -30,7 +30,8 @@ async function flush(){for(let i=0;i<12;i++)await Promise.resolve()}
   el('instagram-code').value='123456';await el('instagram-code-form').onsubmit(event);assert.equal(el('instagram-code').value,'');assert.match(el('instagram-session-status').textContent,/Encrypted session saved/);
   assert.equal(calls.find(c=>c.url.endsWith('/start')).p.username,'operatorfixture');
   el('connection-provider').value='serper';el('connection-provider').onchange();assert.equal(el('connection-brave-settings').hidden,false);
-  el('connection-key').value='synthetic-search-key';el('search-remember').checked=true;el('connection-enabled').checked=true;
+  assert.equal(el('search-remember').checked,true);assert.match(el('connection-brave-settings').textContent,/restored after restarts and updates/);
+  el('connection-key').value='synthetic-search-key';el('connection-enabled').checked=true;
   await el('connection-form').onsubmit(event);assert.equal(el('connection-key').value,'');assert(calls.some(c=>c.url==='/api/search-connection'&&c.p?.provider==='serper'&&c.p.remember));
   el('connection-key').value='must-not-cross-provider';el('connection-provider').value='mwmbl';el('connection-provider').onchange();assert.equal(el('connection-key').value,'');
   await el('connection-form').onsubmit(event);assert.equal(calls.filter(c=>c.url==='/api/search-connection'&&c.p?.provider==='mwmbl').at(-1).p.key,undefined);

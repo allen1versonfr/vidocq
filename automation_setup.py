@@ -70,9 +70,13 @@ class AutomationSetup:
         self.start();return result
     def search(self,p):
         provider=p.get('provider',self.web.provider);payload=dict(p)
-        if provider in ('brave','serper','serpapi') and 'key' not in payload:payload['key']=self.vault.search_key(provider) or (self.web.key if provider=='brave' else self.web.other_keys.get(provider,''))
+        remember=p.get('remember',True)
+        if type(remember) is not bool:raise ValueError('Choose whether to save this connection for restart.')
+        if provider in ('brave','serper','serpapi') and 'key' not in payload:
+            current=self.web.key if provider=='brave' else self.web.other_keys.get(provider,'')
+            payload['key']=current or self.vault.search_key(provider)
         state=self.web.configure(payload)
-        if p.get('remember') is True:
+        if remember and not p.get('forget_saved'):
             if provider!='mwmbl':self.vault.save_search(provider,payload.get('key',''))
             prefs={'provider':provider,'enabled':state['enabled'],'session_limit':state['session_limit']}
             temp=safe_path(self.search_path.with_name('search-connection.json.part'));temp.write_text(json.dumps(prefs),encoding='utf-8');temp.replace(safe_path(self.search_path))
@@ -82,6 +86,7 @@ class AutomationSetup:
         return self.search_status()
     def search_status(self):
         state=self.web.status();state['next_start_provider']=None
+        credentials=self.vault.status();state['key_saved']=state['provider'] in credentials['search_providers'];state['saved_key_locked']=credentials['locked']
         try:
             if self.search_path.is_file() and self.search_path.stat().st_size<4000:state['next_start_provider']=json.loads(self.search_path.read_text(encoding='utf-8')).get('provider')
         except (OSError,ValueError):pass

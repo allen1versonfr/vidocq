@@ -1,3 +1,7 @@
+# 2.18.1
+
+Search connections now save their provider/key with Windows encryption by default and restore after restart/update. Session-only remains explicit. Corrected the stale Brave memory-only hint and retained the current key when saving after a session key change. Added default-save, opt-out, key-rotation and actual updated-executable restore checks.
+
 # 2.18.0 — Audit fixes and evaluation controls
 
 See [audit implementation status](docs/AUDIT_FIXES.md) for identity/evidence/scheduler fixes, local-model selection contracts, provider persistence/accounting, run guards/deadlines, import/checker validation, build hardening and remaining experiment/visual-validation work.

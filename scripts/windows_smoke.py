@@ -314,6 +314,32 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
                 except psutil.NoSuchProcess:pass
     print('Frozen imports/UI/database, executable replacement/restart, and failed-launch rollback passed.')
 
+    # Read the saved connection from a fresh, actually updated executable. Search
+    # remains disabled so this check cannot consume provider credit.
+    with socket.socket() as listener:
+        listener.bind(('127.0.0.1',0));saved_port=listener.getsockname()[1]
+    saved_server=subprocess.Popen([str(root/'success/Vidocq.exe'),'--serve-only','--port',str(saved_port)],env=env)
+    saved_client=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()))
+    saved_base='http://127.0.0.1:'+str(saved_port)
+    try:
+        deadline=time.monotonic()+90
+        while True:
+            try:
+                saved_client.open(saved_base+'/',timeout=10).close()
+                with saved_client.open(saved_base+'/api/search-connection',timeout=10) as response:state=json.load(response)
+                if state['provider']=='brave':break
+            except urllib.error.URLError:pass
+            assert saved_server.poll() is None and time.monotonic()<deadline,'Updated executable did not restore Brave settings'
+            time.sleep(.25)
+        assert state['key_configured'] and state['key_saved'] and not state['enabled']
+        assert state['next_start_provider']=='brave' and 'synthetic-frozen-brave-key' not in json.dumps(state)
+        assert Vault(root/'data').search_key('brave')=='synthetic-frozen-brave-key'
+        print('Actual updated executable restored the encrypted Brave key and disabled preference without provider calls.')
+    finally:
+        if saved_server.poll() is None:
+            subprocess.run(['taskkill','/PID',str(saved_server.pid),'/T','/F'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False)
+        saved_server.wait(timeout=20)
+
     burn_folder=root/'disposable-burn';burn_folder.mkdir()
     burn_target=burn_folder/'Disposable-Vidocq.exe';shutil.copyfile(exe,burn_target)
     burn_backup=burn_target.with_name(burn_target.name+'.previous');shutil.copyfile(exe,burn_backup)

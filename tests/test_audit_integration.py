@@ -109,12 +109,37 @@ class PersistenceTests(unittest.TestCase):
         if os.name!='nt':self.skipTest('Windows DPAPI')
         with tempfile.TemporaryDirectory() as temp:
             web=WebSearch();setup=AutomationSetup(temp,web,MagicMock(),MagicMock(),MagicMock())
-            setup.search({'provider':'brave','key':'synthetic-brave-key','enabled':True,'remember':True})
+            setup.search({'provider':'brave','key':'synthetic-brave-key','enabled':True})
             self.assertNotIn(b'synthetic-brave-key',Path(temp,'credentials.dpapi').read_bytes())
             restored=WebSearch();other=AutomationSetup(temp,restored,MagicMock(),MagicMock(),MagicMock());other.choices['mwmbl']=True
             with patch('web_search.build_opener') as network:other._start();network.assert_not_called()
             self.assertEqual(restored.provider,'brave');self.assertTrue(restored.enabled)
+            self.assertEqual(restored.key,'synthetic-brave-key');self.assertTrue(other.search_status()['key_saved'])
             other.search({'provider':'mwmbl','enabled':True,'remember':False});self.assertEqual(other.search_status()['next_start_provider'],'brave')
+            other.search({'provider':'brave','key':'','enabled':False,'forget_saved':True})
+            self.assertFalse(other.search_path.exists());self.assertEqual(other.vault.search_key('brave'),'')
+    @unittest.skipUnless(__import__('os').name=='nt','Windows DPAPI')
+    def test_session_only_connection_is_not_saved(self):
+        with tempfile.TemporaryDirectory() as temp:
+            setup=AutomationSetup(temp,WebSearch(),MagicMock(),MagicMock(),MagicMock())
+            setup.search({'provider':'brave','key':'synthetic-session-key','enabled':True,'remember':False})
+            self.assertFalse(setup.search_path.exists());self.assertFalse(setup.vault.path.exists())
+            self.assertIsNone(setup.search_status()['next_start_provider'])
+            restored=WebSearch()
+            with patch.dict('os.environ',{},clear=True),patch('web_search.build_opener') as network:
+                restored=WebSearch();AutomationSetup(temp,restored,MagicMock(),MagicMock(),MagicMock())._start();network.assert_not_called()
+            self.assertFalse(restored.key);self.assertFalse(restored.enabled)
+            with self.assertRaises(ValueError):setup.search({'enabled':True,'remember':'yes'})
+    @unittest.skipUnless(__import__('os').name=='nt','Windows DPAPI')
+    def test_saving_current_connection_retains_rotated_session_key(self):
+        with tempfile.TemporaryDirectory() as temp:
+            setup=AutomationSetup(temp,WebSearch(),MagicMock(),MagicMock(),MagicMock())
+            setup.search({'provider':'brave','key':'synthetic-old-key','enabled':True})
+            setup.search({'provider':'brave','key':'synthetic-new-key','enabled':True,'remember':False})
+            self.assertEqual(setup.vault.search_key('brave'),'synthetic-old-key')
+            setup.search({'provider':'brave','enabled':True})
+            restored=WebSearch();AutomationSetup(temp,restored,MagicMock(),MagicMock(),MagicMock())._start()
+            self.assertEqual(restored.key,'synthetic-new-key')
     def test_checker_pair_must_share_fingerprint(self):
         with tempfile.TemporaryDirectory() as temp:
             client=MagicMock();client.quarantined_sites={'GitHub':'held'}
