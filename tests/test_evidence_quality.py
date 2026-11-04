@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 from evidence_quality import source_quality,ranked_ai_records
 from assisted_investigation import relevance,synthesis
 from retrieval_diagnostics import diagnose_control
@@ -43,4 +44,6 @@ class DraftQualityTests(unittest.TestCase):
         self.assertNotIn('associated',result['claims'][0]['text']);self.assertEqual(result['claims'][0]['quote'],'Example Person and Other Person')
     def test_discovery_page_cannot_be_cited_as_ai_evidence(self):
         self.run['records'][0]['reference']='https://www.tiktok.com/discover/fixture'
-        with self.assertRaises(ValueError):self.generate({'claims':[{'citation':'R1','quote':'published public source'}]})
+        with patch('local_drafts.build_opener') as network:
+            result=self.client.generate(self.case,self.run,'summary',True)
+        network.assert_not_called();self.assertEqual(result['claims'],[])

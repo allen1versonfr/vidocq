@@ -68,7 +68,8 @@ class AssessmentTests(unittest.TestCase):
         comparison={'type':'difference','citations':['R1','R2'],'quotes':['published public source','different display name'],'explanation':'The cited excerpts describe different public source text.'}
         result=self.generate({'comparisons':[comparison],'next_step_indexes':[0]},'assessment');self.assertEqual(len(result['comparisons']),1);self.assertTrue(result['next_steps'])
         for bad in [{**comparison,'citations':['R1','R1']},{**comparison,'quotes':['invented passage','different display name']},{**comparison,'explanation':'There are 9999 publications.'}]:
-            with self.assertRaises(ValueError):self.generate({'comparisons':[bad],'next_step_indexes':[0]},'assessment')
+            result=self.generate({'comparisons':[bad],'next_step_indexes':[0]},'assessment')
+            self.assertEqual(result['comparisons'],[]);self.assertEqual(len(result['rejected_items']),1);self.assertTrue(result['next_steps'])
         with self.assertRaises(ValueError):self.generate({'comparisons':[],'next_step_indexes':[999]},'assessment')
     def test_generic_ownership_warning_does_not_count_as_substantive_synthesis(self):
         self.run['records'][0]['detail']='Public username check only. A matching handle is not proof of account ownership or common identity.'

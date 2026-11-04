@@ -1,4 +1,5 @@
 """Opt-in, pinned local AI installer and authenticated on-demand runtime."""
+from run_control import read_bounded
 import atexit
 import hashlib
 import json
@@ -15,6 +16,8 @@ from urllib.parse import urlparse
 from urllib.request import Request,build_opener,HTTPRedirectHandler,ProxyHandler
 from zipfile import ZipFile
 from local_ai_assets import MODEL,RUNTIME,RUNTIME_FILES
+from child_environment import environment
+from run_control import timeout
 
 HOSTS={'huggingface.co','us.aws.cdn.hf.co','eu.aws.cdn.hf.co','cas-bridge.xethub.hf.co','cdn-lfs.hf.co','cdn-lfs-us-1.hf.co','github.com','release-assets.githubusercontent.com','objects.githubusercontent.com'}
 
@@ -42,6 +45,7 @@ def digest(path,cancel=None):
     value=hashlib.sha256()
     with safe_path(path).open('rb') as stream:
         while block:=stream.read(4*1024*1024):
+            timeout()
             if cancel and cancel.is_set():raise ValueError('Setup cancelled; verified existing files are preserved.')
             value.update(block)
     return value.hexdigest()
@@ -120,7 +124,7 @@ class WindowsJob:
 
 class ManagedLocalAI:
     def __init__(self,data):
-        self.data=Path(data);self.root=self.data/'local-ai';self.settings_path=self.data/'local-ai.json'
+        self.data=safe_path(data);self.root=self.data/'local-ai';self.settings_path=self.data/'local-ai.json'
         self.lock=threading.RLock();self.lifecycle=threading.RLock();self.worker=None;self.cancelled=threading.Event();self.process=None;self.job=None;self.port=None;self.key=''
         self.phase='idle';self.message='Optional local AI is not installed.';self.received=0;self.total=0;self.backend_used=None
         self.settings={'enabled':False,'backend':'vulkan'}
@@ -144,7 +148,7 @@ class ManagedLocalAI:
     def status(self):
         with self.lock:
             running=bool(self.process and self.process.poll() is None)
-            return {'supported':os.name=='nt','installed':self.installed(),'enabled':self.enabled,'running':running,'busy':self.busy,'phase':self.phase,'message':self.message,'received':self.received,'total':self.total,'backend':self.settings['backend'],'backend_used':self.backend_used,'model':MODEL['name'],'model_bytes':MODEL['size'],'runtime_version':RUNTIME['version'],'download_bytes':MODEL['size']+RUNTIME['size'],'directory':str(self.root),'port':self.port if running else None,'notice':'Optional pinned downloads from GitHub and Hugging Face. Installation survives app updates. Inference is local, authenticated and starts on demand; no cloud fallback.'}
+            return {'supported':os.name=='nt','installed':self.installed(),'enabled':self.enabled,'running':running,'busy':self.busy,'phase':self.phase,'message':self.message,'received':self.received,'total':self.total,'backend':self.settings['backend'],'backend_used':self.backend_used,'model':MODEL['name'],'model_bytes':MODEL['size'],'runtime_version':RUNTIME['version'],'download_bytes':MODEL['size']+RUNTIME['size'],'task_contract':getattr(self,'contract_check',{'tested':False,'passed':False}),'directory':str(self.root),'port':self.port if running else None,'notice':'Optional pinned downloads from GitHub and Hugging Face. Installation survives app updates. Inference is local, authenticated and starts on demand; no cloud fallback.'}
     def _save(self):
         safe_path(self.data).mkdir(parents=True,exist_ok=True)
         part=safe_path(self.settings_path.with_name('local-ai.json.part'));part.write_text(json.dumps(self.settings),encoding='utf-8');os.replace(part,safe_path(self.settings_path))
@@ -187,6 +191,11 @@ class ManagedLocalAI:
             port,key=self.ensure(internal=True)
             result=self._request(port,key,'/v1/chat/completions',{'model':'vidocq-qwen3-4b','messages':[{'role':'system','content':'Return only JSON.'},{'role':'user','content':'Return {"ok": true}.'}],'temperature':0,'max_tokens':32,'response_format':{'type':'json_object'}})
             if json.loads(result['choices'][0]['message']['content']).get('ok') is not True:raise ValueError('Local model did not pass its synthetic setup check.')
+            self.contract_check={'tested':True,'passed':False}
+            try:
+                check=self._request(port,key,'/v1/chat/completions',{'model':'vidocq-qwen3-4b','messages':[{'role':'system','content':'Select IDs only. Return JSON.'},{'role':'user','content':'Excerpt IDs: R001-S1 is a public biography; R002-S1 is an unrelated menu. Return {"selection_ids":["R001-S1"]}.'}],'temperature':0,'max_tokens':64,'response_format':{'type':'json_object'}})
+                self.contract_check['passed']=json.loads(check['choices'][0]['message']['content']).get('selection_ids')==['R001-S1']
+            except (ValueError,KeyError,TypeError):pass
             if self.cancelled.is_set():raise ValueError('Setup cancelled. Verified files are preserved.')
             self.stop()
             with self.lock:self.phase='ready';self.message='Local AI installed and checked. Updates reuse these files. '+('CPU fallback is active.' if self.backend_used=='cpu' and backend=='vulkan' else 'Vulkan acceleration selected.' if backend=='vulkan' else 'CPU mode selected.')
@@ -200,8 +209,8 @@ class ManagedLocalAI:
     def _request(self,port,key,path,payload=None):
         opener=build_opener(ProxyHandler({}),NoLocalRedirect())
         headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'}
-        with opener.open(Request('http://127.0.0.1:'+str(port)+path,data=None if payload is None else json.dumps(payload).encode(),headers=headers),timeout=45) as response:
-            raw=response.read(64001)
+        with opener.open(Request('http://127.0.0.1:'+str(port)+path,data=None if payload is None else json.dumps(payload).encode(),headers=headers),timeout=timeout(45)) as response:
+            raw=read_bounded(response,64000)
             if len(raw)>64000:raise ValueError('Local model response too large.')
             return json.loads(raw)
     def ensure(self,internal=False):
@@ -217,16 +226,18 @@ class ManagedLocalAI:
             if digest(self.root/MODEL['filename'])!=MODEL['sha256']:raise ValueError('Model integrity check failed; run setup to repair it.')
             modes=['vulkan','cpu'] if self.settings['backend']=='vulkan' else ['cpu']
             for mode in modes:
+                timeout()
                 if self.cancelled.is_set():raise ValueError('Setup cancelled.')
                 with socket.socket() as listener:listener.bind(('127.0.0.1',0));self.port=listener.getsockname()[1]
                 self.key=secrets.token_urlsafe(32)
                 command=[str(runtime/'llama-server.exe'),'-m',str(self.root/MODEL['filename']),'--host','127.0.0.1','--port',str(self.port),'--alias','vidocq-qwen3-4b','-c','8192','-np','1','-ngl','99' if mode=='vulkan' else '0','--offline','--no-webui','--log-disable']
                 if mode=='cpu':command+=['--device','none']
-                env={k:v for k,v in os.environ.items() if not k.startswith(('LLAMA_','GGML_','HF_'))};env['LLAMA_API_KEY']=self.key
+                env=environment({'LLAMA_API_KEY':self.key})
                 self.process=subprocess.Popen(command,cwd=runtime,env=env,stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
                 try:
                     self.job=WindowsJob(self.process);deadline=time.monotonic()+75
                     while time.monotonic()<deadline and not self.cancelled.is_set() and self.process.poll() is None:
+                        timeout()
                         try:
                             if self._request(self.port,self.key,'/health').get('status')=='ok':self.backend_used=mode;return self.port,self.key
                         except (ValueError,OSError):pass

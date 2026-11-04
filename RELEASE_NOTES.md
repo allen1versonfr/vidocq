@@ -1,3 +1,17 @@
+# Vidocq 2.18.0
+
+Repairs account/URL identity matching, supported-clue scheduling, canonicalization and report failure handling. A shared platform registry recognizes public profile shapes and aliases; supplied profiles, rediscoveries and new candidates are counted separately. Retrieval ranks, cache use and source observations survive into reports.
+
+The local model selects finite excerpt and link IDs instead of reconstructing evidence. Empty selections are valid; unsupported items are isolated; comparisons distinguish source independence. Mode-level timing, usage and rejection details remain visible. Runtime setup includes a separate synthetic task check.
+
+Adds opt-in encrypted Brave persistence, provider-preserving startup, provider-specific cooldowns, duplicate-request sharing, per-run API caps, cooperative deadlines, bounded HTTP workers, frozen active-run configuration and nested import validation. Checker controls must match the current database/runtime fingerprint. Lightweight progress and history metadata reduce repeated full-report loads.
+
+Build dependencies are hash-locked and scanned in an isolated tool environment. Pillow 13.0.0, pypdf 6.21.4 and cryptography 50.0.2 replace versions flagged by that scan. The release adds a main-Python CycloneDX inventory; native and collector dependencies have separate manifests and are outside that inventory's scope.
+
+See docs/AUDIT_FIXES.md for all audit items and remaining validation limits. Software tests and synthetic local-model checks do not establish a discovery-score improvement. Private benchmarks were not rerun or published. Native visual verification and live operator Instagram login are not claimed.
+
+Previous release:
+
 # Vidocq 2.17.2
 
 Repeated Brave queries now use a copy-safe 15-minute session cache, including when the network request cap is reached. Quota errors pause further requests for a minute. Requests use the fixed Brave endpoint without system proxies or redirects. Each completed response records provider/retained counts, original rank and reasons for filtering; report exports show those counts. Offline diagnostics distinguish an empty provider response from rows discarded by the adapter. Approved adaptive searches try separate supplied first/last name tokens before adding more constraints, within the original search budget.

@@ -1,3 +1,7 @@
+# 2.18.0 — Audit fixes and evaluation controls
+
+See [audit implementation status](docs/AUDIT_FIXES.md) for identity/evidence/scheduler fixes, local-model selection contracts, provider persistence/accounting, run guards/deadlines, import/checker validation, build hardening and remaining experiment/visual-validation work.
+
 # 2.17.2 — Brave retrieval auditing and bounded query refinement
 
 Cache repeated Brave queries for 15 minutes within the session without charging the request budget again; stop new Brave requests during quota cooldown. Preserve provider rank and request-local counts for examined, retained, out-of-scope, unsafe, malformed and duplicate rows. Include the audit in report coverage and exports. Offline diagnostics distinguish all-rows-filtered from provider-empty responses. Prioritize separate supplied first/last name tokens before adding exact-match constraints in approved adaptive searches. No new provider, identifier guessing, automatic paid fallback or extra budget.

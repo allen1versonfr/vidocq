@@ -1,4 +1,6 @@
 """Documented HIBP API, passive HarvestView API, and scoped Maigret companion."""
+from run_control import read_bounded
+from run_control import timeout as bounded_timeout,reserve as reserve_request
 import copy
 import json
 import re
@@ -20,12 +22,13 @@ def transport(url,payload=None,key=None,service='hibp',timeout=15):
         path_ok=bool(re.fullmatch(r'/api/v1/(?:sources|runs(?:/[A-Za-z0-9-]{1,80}(?:/cancel)?)?)',p.path)) if service=='harvester' else p.path in ('/api/about','/api/search','/api/cancel')
         valid=p.scheme=='http' and p.hostname=='127.0.0.1' and p.port is not None and 1024<=p.port<=65535 and path_ok
     if not valid or p.username or p.password:raise ValueError('Collector destination is not reviewed.')
+    if service=='hibp':reserve_request('hibp')
     headers={'Accept':'application/json','User-Agent':'Vidocq/'+VERSION+' (+https://github.com/allen1versonfr/vidocq)'}
     if key:headers[{'hibp':'hibp-api-key','harvester':'X-API-Key','maigret':'X-Vidocq-Key'}[service]]=key
     raw=None
     if payload is not None:headers['Content-Type']='application/json';raw=json.dumps(payload).encode()
     try:
-        with build_opener(ProxyHandler({}),NoRedirect()).open(Request(url,data=raw,headers=headers),timeout=timeout) as response:data=response.read(2_000_001)
+        with build_opener(ProxyHandler({}),NoRedirect()).open(Request(url,data=raw,headers=headers),timeout=bounded_timeout(timeout)) as response:data=read_bounded(response,2_000_000)
         if len(data)>2_000_000:raise ValueError('Collector response exceeded 2 MB.')
         return json.loads(data)
     except HTTPError as e:
@@ -117,7 +120,9 @@ class AdditionalCollectors:
 
     def _cancel_backend(self,kind,base,key,job):
         path='/api/v1/runs/'+job+'/cancel' if kind=='harvester' else '/api/cancel'
-        try:transport(base+path,{} if kind=='harvester' else {'run_id':job},key,kind,timeout=5)
+        try:
+            from run_control import cleanup_scope
+            with cleanup_scope():transport(base+path,{} if kind=='harvester' else {'run_id':job},key,kind,timeout=5)
         except ValueError:pass
 
     def cancel(self,run_id):

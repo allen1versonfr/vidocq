@@ -1,4 +1,5 @@
 """Start the bundled, isolated Maigret companion without installing software."""
+from child_environment import environment
 import atexit
 import os
 from pathlib import Path
@@ -11,13 +12,13 @@ import time
 
 class ManagedMaigret:
     def __init__(self):
-        self.lock=threading.RLock();self.process=None;self.port=None;self.key='';self.state='stopped'
+        self.lock=threading.RLock();self.process=None;self.port=None;self.key='';self.state='stopped';self.database_fingerprint=None
         atexit.register(self.stop)
 
     def status(self):
         with self.lock:
             alive=self.process is not None and self.process.poll() is None
-            return {'state':self.state if alive or self.state=='starting' else 'stopped','running':alive,'bundled':True}
+            return {'state':self.state if alive or self.state=='starting' else 'stopped','running':alive,'bundled':True,'database_sha256':self.database_fingerprint}
 
     def ensure(self):
         from additional_collectors import transport
@@ -30,7 +31,7 @@ class ManagedMaigret:
             if getattr(sys,'frozen',False):command=[sys.executable,'--maigret-companion']
             else:command=[sys.executable,str(Path(__file__).resolve().parent/'scripts/maigret_bridge.py')]
             command+=['--port',str(self.port),'--parent-pid',str(os.getpid())]
-            env=dict(os.environ,VIDOCQ_MAIGRET_BRIDGE_KEY=self.key)
+            env=environment({'VIDOCQ_MAIGRET_BRIDGE_KEY':self.key},same_bundle=True)
             # A child uses the parent's extracted bundle and never opens a console.
             env.pop('PYINSTALLER_RESET_ENVIRONMENT',None)
             try:
@@ -42,6 +43,7 @@ class ManagedMaigret:
                     try:
                         about=transport('http://127.0.0.1:'+str(self.port)+'/api/about',key=self.key,service='maigret',timeout=10)
                         if about.get('service')=='vidocq-maigret-bridge' and about.get('protocol')==1:
+                            self.database_fingerprint=about.get('database_sha256')
                             self.state='ready';return self.key,self.port
                     except (ValueError,OSError):pass
                     time.sleep(.15)

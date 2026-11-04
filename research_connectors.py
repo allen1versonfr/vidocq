@@ -1,4 +1,6 @@
 """Opt-in Steam API and local Osintgram 2.x adapters; never execute downloaded code."""
+from run_control import read_bounded
+from run_control import timeout as bounded_timeout,reserve as reserve_request
 import json
 import re
 import secrets
@@ -36,13 +38,14 @@ def read_json(url, payload=None, local=False, timeout=20, local_key=None):
     p=urlparse(url)
     allowed=(p.scheme=='http' and p.hostname=='127.0.0.1' and p.path in ('/api/about','/api/run','/api/cancel') and p.port and 1024<=p.port<=65535) if local else (p.scheme=='https' and p.hostname in ('api.steampowered.com','communitybanlist.com') and p.port is None)
     if not allowed or p.username or p.password: raise ValueError('Connector destination is not reviewed.')
+    if not local:reserve_request('connector:'+p.hostname)
     headers={'Accept':'application/json','User-Agent':'Vidocq research connector'}
     if local_key:headers['X-Vidocq-Key']=local_key
     data=None
     if payload is not None:headers['Content-Type']='application/json';data=json.dumps(payload).encode()
     try:
-        with build_opener(ProxyHandler({}),NoRedirect()).open(Request(url,data=data,headers=headers),timeout=timeout) as response:
-            raw=response.read(2_000_001)
+        with build_opener(ProxyHandler({}),NoRedirect()).open(Request(url,data=data,headers=headers),timeout=bounded_timeout(timeout)) as response:
+            raw=read_bounded(response,2_000_000)
         if len(raw)>2_000_000:raise ValueError('Connector response exceeded 2 MB.')
         return json.loads(raw)
     except HTTPError as e:raise ConnectorUnavailable('Connector returned HTTP '+str(e.code)+'. Check access, quota and configuration; this is not a no-match result.') from None
@@ -235,7 +238,9 @@ class ResearchConnectors:
             with self.lock:self.pending.pop(job,None)
 
     def _cancel_job(self,base,job):
-        try:read_json(base+'/api/cancel',{'run_id':job},local=True,timeout=5,local_key=self.managed_key if self.managed_manager else '')
+        try:
+            from run_control import cleanup_scope
+            with cleanup_scope():read_json(base+'/api/cancel',{'run_id':job},local=True,timeout=5,local_key=self.managed_key if self.managed_manager else '')
         except ValueError:pass
 
     def cancel(self,run_id):

@@ -49,12 +49,14 @@ class Vault:
         return {'backend':'hikerapi','hiker_key':value.get('hiker_key','')}
     def search_key(self,provider):return self.load().get('search_keys',{}).get(provider,'')
     def save_search(self,provider,key):
-        if provider not in ('serper','serpapi') or not isinstance(key,str) or len(key)>500 or (key and any(not (c.isascii() and (c.isalnum() or c in '._-')) for c in key)):raise ValueError('Invalid search provider key.')
+        if provider not in ('brave','serper','serpapi') or not isinstance(key,str) or len(key)>500 or (key and any(not (c.isascii() and (c.isalnum() or c in '._-')) for c in key)):raise ValueError('Invalid search provider key.')
         with self.lock:
             value=self.load();keys=value.setdefault('search_keys',{})
             if key:keys[provider]=key
             else:keys.pop(provider,None)
-            self.write(value)
+            if not keys:value.pop('search_keys',None)
+            if value:self.write(value)
+            else:self.forget()
         return self.status()
     def forget(self):
         safe_path(self.path).unlink(missing_ok=True);safe_path(self.path.with_name('credentials.dpapi.part')).unlink(missing_ok=True)

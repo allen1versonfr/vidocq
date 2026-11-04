@@ -1,3 +1,13 @@
+# Validation for Vidocq 2.18.0
+
+308 Python tests pass in the hash-locked Windows build environment (one Windows symlink-capability skip). Audit regressions cover profile/URL identity, clue scheduling, evidence selection, provider state and report robustness. Synthetic integration fixtures cover item-level AI rejection, run budgets/deadlines, configuration guards, persistence, nested restore validation and offline benchmark eligibility. Research UI DOM and browser-export fixtures pass. No native visual browser validation is claimed.
+
+A real local Qwen check on synthetic evidence completed planning, explicit-link abstention, exact excerpt selection and finite next actions. This verifies the response contract, not discovery accuracy. Main locked dependencies passed pip-audit with no known vulnerabilities reported at scan time; the release inventory covers the main Python environment, with native and isolated collector dependencies outside that scope.
+
+Private saved-report replay used no provider calls and preserved the original sealed artifacts. Private benchmarks were not rerun, and no discovery-score improvement is claimed. Held-out strategy/model comparisons and independently dated ownership/visibility labels remain pending. Live operator Instagram authentication was not tested. Public index canaries and the actual packaged Windows API, update/restart, rollback and disposable cleanup checks passed locally; CI repeats them before publication.
+
+Previous validation:
+
 # Validation for Vidocq 2.17.2
 
 278 Python tests pass locally (one Windows symlink-capability skip). Synthetic Brave fixtures prove cache hits preserve copies and do not spend request budget, quota cooldown prevents repeated network attempts, provider/adapter counts and source rank survive the adapter, API keys remain absent from reports, and all-filtered responses are diagnosed separately from empty results. Finite query-order fixtures prioritize supplied first/last tokens. No live paid or personal queries were made. CI runs Windows packaged smoke/update/recovery checks before publication. This is retrieval instrumentation and query refinement, not evidence of improved real-world recall.
