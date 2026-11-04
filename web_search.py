@@ -7,6 +7,7 @@ from urllib.request import Request,HTTPRedirectHandler,build_opener,ProxyHandler
 from version import VERSION
 from concurrent.futures import Future
 from run_control import reserve,timeout
+from search_queries import render_query
 
 class SearchNotConfigured(ValueError):pass
 class SearchLimit(ValueError):pass
@@ -21,7 +22,7 @@ class WebSearch:
     def __init__(self):
         self.key=os.environ.get('VIDOCQ_BRAVE_API_KEY','');self.enabled=bool(self.key);self.provider='brave' if self.key else 'mwmbl'
         self.lock=threading.RLock();self.requests=0;self.free_lock=threading.Lock();self.next_free=0;self.cooldowns={};self.cache={};self.inflight={};self.provider_counts={}
-        self.other_keys={};self.session_limit=100
+        self.other_keys={};self.session_limit=100;self.brave_result_limit=10
     @property
     def cooldown_until(self):return self.cooldowns.get(self.provider,0)
     @cooldown_until.setter
@@ -35,7 +36,7 @@ class WebSearch:
             ready=self.provider=='mwmbl' or bool(self.other_keys.get(self.provider) if self.provider in ('serper','serpapi') else self.key)
             message=('Free Mwmbl search enabled. No account, key or payment is used; its smaller index may miss accounts.' if self.enabled else 'Free Mwmbl search is available. Enable it without an account, key or payment.') if self.provider=='mwmbl' else ('Optional Brave search enabled; your provider plan applies.' if self.enabled and self.key else 'Brave is optional. Add its key or choose free Mwmbl search.')
             if self.provider in ('serper','serpapi'):message=self.label()+(' enabled; your provider quota/charges apply.' if self.enabled and ready else ' needs your own API key. A free allowance is not unlimited access.')
-            return {'configured':ready and self.enabled,'key_configured':ready if self.provider!='mwmbl' else bool(self.key),'enabled':self.enabled,'provider':self.provider,'provider_name':self.label(),'requires_key':self.provider!='mwmbl','session_requests':self.requests,'session_limit':self.session_limit,'message':message,'free_cooldown_seconds':max(0,round(self.cooldown_until-time.monotonic()))}
+            return {'configured':ready and self.enabled,'key_configured':ready if self.provider!='mwmbl' else bool(self.key),'enabled':self.enabled,'provider':self.provider,'provider_name':self.label(),'requires_key':self.provider!='mwmbl','session_requests':self.requests,'session_limit':self.session_limit,'brave_result_limit':self.brave_result_limit,'message':message,'free_cooldown_seconds':max(0,round(self.cooldown_until-time.monotonic()))}
     def configure(self,data):
         if not isinstance(data,dict) or type(data.get('enabled')) is not bool:raise ValueError('Choose whether web search is enabled.')
         key=data.get('key')
@@ -48,6 +49,9 @@ class WebSearch:
             if data['enabled'] and provider!='mwmbl' and not new_key:raise ValueError('This provider needs its API key. Choose free Mwmbl to search without one.')
             limit=data.get('session_limit',self.session_limit)
             if type(limit) is not int or not 1<=limit<=100:raise ValueError('Choose a search session request cap from 1 to 100.')
+            depth=data.get('brave_result_limit',self.brave_result_limit)
+            if type(depth) is not int or depth not in (10,20):raise ValueError('Choose 10 or 20 Brave results per request.')
+            self.brave_result_limit=depth
             self.session_limit=limit
             if provider in ('serper','serpapi'):self.other_keys[provider]=new_key
             else:self.key=new_key
@@ -56,9 +60,10 @@ class WebSearch:
         return self.status()
     def _free_search(self,query,site):
         source='https://api.mwmbl.org/api/v2/search/?'+urlencode({'q':query})
+        cache_key=query.casefold()
         with self.free_lock:
             if time.monotonic()<self.cooldown_until:raise SearchLimit('Free search is cooling down after a provider rate/quota limit. No request sent; this is not a no-match result.')
-            cached=self.cache.get(query)
+            cached=self.cache.get(cache_key)
             if cached and time.monotonic()-cached[0]<900:
                 rows,diagnostics=copy.deepcopy(cached[1]);diagnostics['cache_hit']=True
                 return IndexResult(source,rows,diagnostics)
@@ -87,7 +92,7 @@ class WebSearch:
                     rows.append({'title':text(item['title'])[:500],'detail':text(item['content'])[:4000] or 'No index snippet supplied.','reference':url,'index_engine':str(item.get('engine','mwmbl'))[:80],'index_rank':rank})
                     if len(rows)==10:break
                 diagnostics={'provider_rows':len(data['results']),'examined_rows':examined,'retained_rows':len(rows),'excluded':excluded,'cache_hit':False,'result_limit':10}
-                self.cache[query]=(time.monotonic(),copy.deepcopy((rows,diagnostics)))
+                self.cache[cache_key]=(time.monotonic(),copy.deepcopy((rows,diagnostics)))
                 return IndexResult(source,rows,diagnostics)
             except HTTPError as error:
                 if error.code==429:
@@ -101,7 +106,7 @@ class WebSearch:
         if not isinstance(terms,list) or not 1<=len(terms)<=4 or any(not isinstance(t,str) or not t.strip() or len(t)>2000 or any(ord(c)<32 for c in t) for t in terms) or sum(len(t) for t in terms)>2200:raise ValueError('Invalid context search terms.')
         return self.search('',terms=terms)
     def search(self,value,site=None,terms=None):
-        identity=(self.provider,str(value),site,tuple(terms or []))
+        identity=(self.provider,render_query(terms if terms is not None else [str(value)],site).casefold(),self.brave_result_limit if self.provider=='brave' else 10)
         with self.lock:
             future=self.inflight.get(identity);owner=future is None
             if owner:future=Future();self.inflight[identity]=future
@@ -116,19 +121,17 @@ class WebSearch:
             if owner:
                 with self.lock:self.inflight.pop(identity,None)
     def _search(self,value,site=None,terms=None):
-        if site is not None and site not in ('instagram.com','tiktok.com','vsco.co','steamcommunity.com'):raise ValueError('Unsupported social index scope.')
+        query=render_query(terms if terms is not None else [str(value)],site)
         with self.lock:
             if not self.enabled:raise SearchNotConfigured('Web search was not run: enable free Mwmbl search in Search connection. Brave is optional; no payment is needed for Mwmbl.')
             provider=self.provider
             key=self.other_keys.get(provider,'') if provider in ('serper','serpapi') else self.key
             if provider!='mwmbl' and not key:raise SearchNotConfigured('Search provider is not configured. Choose free Mwmbl or add your own key.')
-        query='"'+str(value).replace('"','').replace('\\','')+'"'
-        if terms is not None:query=' '.join('"'+str(t).replace('"','').replace('\\','')+'"' for t in terms)
-        if site:query='site:'+site+' '+query
         if provider=='mwmbl':return self._free_search(query,site)
         if provider in ('serper','serpapi'):return self._major_search(provider,key,query,site)
-        source='https://api.search.brave.com/res/v1/web/search?'+urlencode({'q':query,'count':10,'safesearch':'moderate','text_decorations':'false'})
-        identity=('brave',query,site)
+        depth=self.brave_result_limit
+        source='https://api.search.brave.com/res/v1/web/search?'+urlencode({'q':query,'count':depth,'safesearch':'moderate','text_decorations':'false'})
+        identity=('brave',query.casefold(),site,depth)
         with self.lock:
             cached=self.cache.get(identity)
             if cached and time.monotonic()-cached[0]<900:
@@ -149,7 +152,7 @@ class WebSearch:
             elif not isinstance(web,dict) or not isinstance(web.get('results'),list):raise ValueError('Search provider returned an unexpected web-result format.')
             else:results=web['results']
             rows=[];excluded={'malformed':0,'unsafe_url':0,'outside_scope':0,'duplicate':0};seen=set()
-            for rank,item in enumerate(results[:10],1):
+            for rank,item in enumerate(results[:depth],1):
                 if not isinstance(item,dict):excluded['malformed']+=1;continue
                 url=str(item.get('url',''));p=urlparse(url)
                 try:invalid_port=p.port is not None
@@ -160,7 +163,7 @@ class WebSearch:
                 seen.add(url)
                 text=lambda x:html.unescape(re.sub('<[^>]+>','',str(x)))
                 rows.append({'title':text(item.get('title','Indexed page'))[:500],'detail':text(item.get('description','No index snippet supplied.'))[:4000], 'reference':url,'index_rank':rank})
-            diagnostics={'provider_rows':len(results),'examined_rows':min(10,len(results)),'retained_rows':len(rows),'excluded':excluded,'cache_hit':False,'query_mode':'quoted-terms','result_limit':10}
+            diagnostics={'provider_rows':len(results),'examined_rows':min(depth,len(results)),'retained_rows':len(rows),'excluded':excluded,'cache_hit':False,'query_mode':'quoted-terms','result_limit':depth}
             with self.lock:self.cache[identity]=(time.monotonic(),copy.deepcopy((rows,diagnostics)))
             return IndexResult(source,rows,diagnostics)
         except HTTPError as error:
@@ -172,7 +175,7 @@ class WebSearch:
         except (URLError,TimeoutError,OSError):raise ValueError('Could not reach the search API. Check network/proxy settings; the query did not complete.') from None
 
     def _major_search(self,provider,key,query,site):
-        identity=(provider,query)
+        identity=(provider,query.casefold())
         endpoint='https://google.serper.dev/search' if provider=='serper' else 'https://serpapi.com/search.json'
         source=endpoint+'?'+urlencode({'q':query,'engine':'google'})
         with self.lock:

@@ -11,8 +11,9 @@ from research_connectors import normalize_steam
 from social_profiles import detect_platform, normalize_profile, profile_reference
 from collector_policy import HARVESTER_SOURCES,MAIGRET_SITES,DEFAULT_MAIGRET_SITES,selected
 from discovery_tools import query_plan
-from evidence_quality import source_quality
-from profile_registry import account_identity,same_reference,canonical_reference,url_tokens,HOST_ALIASES
+from evidence_quality import source_quality,evidence_gate
+from profile_registry import account_identity,same_reference,canonical_reference,url_tokens,HOST_ALIASES,content_account_reference
+from search_queries import query_key
 
 KINDS={'names':'person','usernames':'username','emails':'email','phones':'phone','domains':'domain','ips':'ip','instagram':'instagram','tiktok':'tiktok','vsco':'vsco','steam':'steam'}
 COMMANDS=('get_user_info','get_account_about','get_captions','get_hashtags')
@@ -30,6 +31,7 @@ def report_sections(run):
     sections.append(('Search retrieval audit',[c.get('seed','')+' · '+json.dumps(c['retrieval_diagnostics'],ensure_ascii=False) for c in run.get('coverage',[]) if c.get('retrieval_diagnostics')] or ['No adapter-level retrieval counts recorded.']))
     sections.append(('Record retrieval observations',['['+r['id']+'] '+json.dumps(r.get('retrieval_observations',[r.get('retrieval',{})]),ensure_ascii=False) for r in run.get('records',[]) if r.get('retrieval')] or ['No per-record retrieval metadata recorded.']))
     sections.append(('Run limits and request ledger',[json.dumps({'termination':run.get('termination_reason'),'requests':run.get('request_ledger',{})},ensure_ascii=False)]))
+    if run.get('query_diagnostics'):sections.append(('Query efficiency and platform coverage',[json.dumps(run['query_diagnostics'],ensure_ascii=False)]))
     sections.append(('Unanswered questions',analysis['unanswered']))
     sections.append(('Published links and imported leads', ['['+x['citation']+'] '+x['source']+' → '+x['target']+' · '+x['relation']+' · '+x['observed_at'] for x in run.get('link_evidence',[])] or ['No captured link evidence.']))
     sections.append(('Historical aliases (supplied, unverified)',[json.dumps(x,ensure_ascii=False) for x in run['case'].get('aliases',[])] or ['None supplied.']))
@@ -41,7 +43,7 @@ def report_sections(run):
         lines=['Local AI added '+str(ai.get('executed_queries',0))+' attempted search tasks. Model-written findings remain review drafts, never ownership confirmation.']+ai.get('errors',[])
         lines+=['AI phase: '+json.dumps(phase,ensure_ascii=False) for phase in ai.get('phases',[])]
         lines+=['Model item omitted: '+item.get('reason','Invalid selection') for item in (ai.get('summary') or {}).get('rejected_items',[])]
-        for claim in (ai.get('summary') or {}).get('claims',[]):lines.append('['+claim['citation']+'] '+claim.get('text','Source excerpt')+' · Supporting quotation: '+claim['quote'])
+        for claim in (ai.get('summary') or {}).get('claims',[]):lines.append('['+claim['citation']+'] '+claim.get('text','Source excerpt')+' · '+claim.get('relevance_note','Ownership unverified.')+' · Supporting quotation: '+claim['quote'])
         sections.append(('AI-assisted findings — review draft',lines))
         if ai.get('assessment'):sections.append(('AI comparison and next evidence — review draft',[json.dumps(ai['assessment'],ensure_ascii=False)]))
     return sections
@@ -60,7 +62,7 @@ def options(value):
     for field,default in [('enabled',False),('follow_clues',True),('direct_sources',False),('allow_hibp',False),('allow_harvester',False),('allow_maigret',False),('ai_assisted',False),('follow_published_links',False),('adaptive_queries',False),('ai_assessment',True)]:
         result[field]=value.get(field,default)
         if type(result[field]) is not bool:raise ValueError('Invalid investigation setting: '+field)
-    for field,default,low,high in [('max_searches',25,1,40),('max_followups',5,0,10),('depth',1,0,2),('ai_searches',4,0,8),('adaptive_searches',3,0,6),('deadline_seconds',600,10,1800),('provider_requests',40,1,100)]:
+    for field,default,low,high in [('max_searches',25,1,40),('max_followups',5,0,10),('depth',1,0,2),('ai_searches',4,0,8),('adaptive_searches',3,0,6),('platform_searches',4,0,8),('deadline_seconds',600,10,1800),('provider_requests',40,1,100)]:
         number=value.get(field,default)
         if type(number) is not int or not low<=number<=high:raise ValueError('Investigation '+field+' is outside its allowed range.')
         result[field]=number
@@ -112,7 +114,7 @@ def relevance(case,record):
     quality=source_quality(record)
     if quality['kind']=='discovery_page':label=quality['reason']
     if weak and not matched:label='Name formatting similarity — manual review required'
-    return {'label':label,'matched_identifiers':matched,'weak_signals':weak,'strong_anchor':strong,'can_expand':quality['kind']!='discovery_page' and (strong or len(matched)>=2),
+    return {'label':label,'matched_identifiers':matched,'weak_signals':weak,'strong_anchor':strong,'can_expand':quality['usable_for_ai'] and (strong or len(matched)>=2),
             'notice':'Co-occurrence is not proof of identity. A result may concern a namesake, recycled number or unrelated account.'}
 
 def extract_clues(blob,normalize):
@@ -122,6 +124,7 @@ def extract_clues(blob,normalize):
         try:
             if kind=='steam':value=normalize_steam(value)
             elif kind in ('instagram','tiktok','vsco'):value=normalize_profile(kind,value)
+            elif kind=='reference':value=canonical_reference(value)
             else:_,value=normalize(kind,value)
             identity=(kind,value.casefold())
             if identity not in seen:seen.add(identity);found.append({'kind':kind,'value':value})
@@ -146,7 +149,7 @@ def synthesis(run):
         bucket='stronger_leads' if len(r.get('matched_identifiers',[]))>=2 else 'needs_review' if r.get('matched_identifiers') else 'unlinked_results'
         if record.get('analyst_status')=='Rejected':bucket='rejected_evidence'
         elif record.get('lead_only') or r.get('weak_signals'):bucket='needs_review'
-        if source_quality(record)['kind']=='discovery_page' and bucket!='rejected_evidence':bucket='unlinked_results'
+        if not source_quality(record)['usable_for_ai'] and bucket!='rejected_evidence':bucket='unlinked_results'
         grouped[bucket].append({'citation':record['id'],'title':record['title'],'reason':r.get('label','Supplied or offline context; not independently verified.'),'matched_identifiers':r.get('matched_identifiers',[])})
         reported=record.get('observations',{}).get('reported_name')
         names=run['case'].get('names',[])
@@ -186,16 +189,23 @@ def execute(service,run):
 def _execute(service,run):
     from case_reports import now, safe_reference
     from web_search import outcome
-    case=run['case'];opts=options(case.get('investigation'));queue=deque();seen=set();records={};followups=0
-    from research_workflow import variations
+    case=run['case'];opts=options(case.get('investigation'));queue=deque();seen=set();records={};followups=0;indexed_queries=set()
+    from research_workflow import variations,platform_plan
     from profile_evidence import profile_graph
     query_variants=deque(variations(case));run['query_variations']=[]
+    platform_variants=deque(platform_plan(case));platform_scheduled=False
+    run['query_diagnostics']={'duplicate_context_queries':[],'platform_queries':[]}
     cancelled=service.cancel_flags[run['id']];collector_attempts=set();deadline=time.monotonic()+opts['deadline_seconds']
     run.update(status='running',completed=0,total=0,message='Building the investigation plan…',discovered_clues=[],search_log=[],discovery_links=[])
-    def enqueue(kind,value,depth=0,parent=None,origin='supplied'):
-        identity=(kind,json.dumps(value,sort_keys=True).casefold())
+    def enqueue(kind,value,depth=0,parent=None,origin='supplied',site=None):
+        identity=(kind,json.dumps(value,sort_keys=True).casefold(),site)
         if identity in seen:return False
-        seen.add(identity);queue.append({'kind':kind,'value':value,'depth':depth,'parent_citation':parent,'origin':origin});return True
+        key=query_key(value if isinstance(value,list) else [value],site) if kind in ('person','username','context','reference') else None
+        if kind=='context' and key in indexed_queries:
+            if len(run['query_diagnostics']['duplicate_context_queries'])<50:run['query_diagnostics']['duplicate_context_queries'].append({'terms':value,'site':site,'origin':origin,'reason':'Equivalent index query already planned or attempted.'})
+            return False
+        if key:indexed_queries.add(key)
+        seen.add(identity);queue.append({'kind':kind,'value':value,'depth':depth,'parent_citation':parent,'origin':origin,**({'site':site} if site else {})});return True
     for field,kind in KINDS.items():
         for value in case.get(field,[]):enqueue(kind,value)
     # Provided context is input, not independent evidence. Never send full notes to a provider.
@@ -240,7 +250,7 @@ def _execute(service,run):
         entry['retrieval']=observation;entry['retrieval_observations']=[observation]
         entry['resource_id']=hashlib.sha256((canonical_reference(ref) if account_identity(ref) else ref or str(source)).encode()).hexdigest()[:24]
         entry['source_quality']=source_quality(entry)
-        entry['relevance']=relevance(case,entry);apply_decision(case,entry);records[fingerprint]=entry
+        entry['relevance']=relevance(case,entry);apply_decision(case,entry);entry['ai_eligibility']=evidence_gate(entry,case);records[fingerprint]=entry
         return entry
     for finding in run['supplied_findings']:
         capture=finding.get('capture',{})
@@ -263,7 +273,7 @@ def _execute(service,run):
         if not opts['follow_published_links'] or not opts['follow_clues'] or depth>opts['depth'] or rejected(case,url):return
         for clue in extract_clues(url,service.normalize):
             # Explicit public profile links only; do not widen to an entire shared platform.
-            if clue['kind'] not in ('username','instagram','tiktok','vsco','steam'):continue
+            if clue['kind'] not in ('username','instagram','tiktok','vsco','steam','reference'):continue
             if followups>=opts['max_followups'] or run['completed']+1>=opts['max_searches']:return
             if enqueue(clue['kind'],clue['value'],depth,parent,origin):
                 queue[-1]['linked_reference']=url
@@ -283,6 +293,11 @@ def _execute(service,run):
                         source=next((r for r in records.values() if r['id']==lead['citation']),None)
                         if source and source.get('analyst_status')!='Rejected' and lead['url'] in source['detail']:published_link(lead['url'],lead['citation'],'local-ai-cited-public-link',source.get('search_depth',0)+1)
                 except ValueError as e:run['ai']['errors'].append(str(e))
+            if not queue and opts['adaptive_queries'] and not platform_scheduled and getattr(service,'site_search',None):
+                platform_scheduled=True
+                while platform_variants and len(run['query_diagnostics']['platform_queries'])<opts['platform_searches'] and run['completed']+len(queue)<opts['max_searches']:
+                    variant=platform_variants.popleft()
+                    if enqueue('context',variant['terms'],origin='platform-index-coverage',site=variant['site']):run['query_diagnostics']['platform_queries'].append(variant)
             if not queue:break
         priority=lambda t:0 if t['origin'] in ('approved-published-link','local-ai-cited-public-link') else 2 if t['origin'] in ('supplied','supplied-context') else 1 if t['origin']=='discovered' else 3
         task=min(queue,key=priority);queue.remove(task);kind,value=task['kind'],task['value'];seed=kind+': '+(' + '.join(value) if isinstance(value,list) else value)
@@ -291,7 +306,8 @@ def _execute(service,run):
         else:service._save_run(run)
         reports=[]
         try:
-            if kind=='context':reports.append(service.context_search(value))
+            if kind=='context':reports.append(service.site_search(value,task['site']) if task.get('site') else service.context_search(value))
+            elif kind=='reference':reports.append(service.context_search([value]))
             else:reports.append(service.research(kind,value))
         except ValueError as error:reports.append({'results':[{'provider':'Index research','status':'error','message':str(error),'rows':[]}],'links':[]})
         if opts['direct_sources'] and kind in ('steam','instagram') and not cancelled.is_set():
@@ -328,9 +344,14 @@ def _execute(service,run):
                 for row in rows:
                     origin='offline-metadata' if label=='Offline phone metadata' else 'retrieved'
                     entry=record(label,provider.get('source',''),row,task,origin)
-                    if entry['source_quality']['kind']=='discovery_page':continue
+                    if not entry['source_quality']['usable_for_ai']:continue
+                    author=content_account_reference(entry['reference'])
+                    if author and evidence_gate(entry,case)['eligible'] and not rejected(case,author['reference']):
+                        lead=record('Indexed content author',entry['reference'],{'title':'Author profile from indexed content','detail':'Profile address is explicitly present in the indexed content path. Ownership is unverified.','reference':author['reference'],'lead_only':True},dict(task,parent_citation=entry['id']),'derived-public-content')
+                        lead['relevance']=dict(entry['relevance'],can_expand=False);lead['content_parent_citation']=entry['id'];lead['ai_eligibility']=evidence_gate(lead,case)
+                        published_link(author['reference'],entry['id'],'approved-published-link',task['depth']+1)
                     profile=row.get('observations',{}).get('profile') if isinstance(row.get('observations'),dict) else None
-                    if profile and isinstance(profile,dict) and entry.get('analyst_status')!='Rejected':
+                    if profile and isinstance(profile,dict) and evidence_gate(entry,case)['eligible']:
                         from profile_evidence import reviewed_profile
                         try:
                             observed=reviewed_profile({'consent':True,'public_reviewed':True,'reference':entry['reference'],'biography':profile.get('biography',''),'display_name':profile.get('display_name',''),'handle':profile.get('handle',''),'stable_id':profile.get('stable_id',''),'links':profile.get('links',[])})
@@ -350,7 +371,7 @@ def _execute(service,run):
                     reference_clue=ref if detect_platform(ref) or urlparse(ref).hostname in ('steamcommunity.com','www.steamcommunity.com') else ''
                     clues=extract_clues(entry['title']+'\n'+entry['detail']+'\n'+reference_clue,service.normalize)
                     for clue in clues:
-                        identity=(clue['kind'],json.dumps(clue['value'],sort_keys=True).casefold())
+                        identity=(clue['kind'],json.dumps(clue['value'],sort_keys=True).casefold(),None)
                         if identity in seen:continue
                         permitted=not entry.get('lead_only') and (entry['relevance']['can_expand'] or (opts['direct_sources'] and label.startswith(('Steam public profile','Osintgram / get_user_info'))))
                         scheduled=permitted and followups<opts['max_followups'] and run['completed']+1<opts['max_searches'] and not cancelled.is_set()

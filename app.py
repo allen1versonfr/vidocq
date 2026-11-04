@@ -285,9 +285,10 @@ def db():
 
 
 from case_reports import CaseService,report_html,report_markdown
-def context_research(terms):
-    return {'results':[run_adapter(WEB_SEARCH.label()+' context',lambda values:WEB_SEARCH.search_terms(values),terms)],'links':[]}
+def context_research(terms,site=None):
+    return {'results':[run_adapter(WEB_SEARCH.label()+' context',lambda values:WEB_SEARCH.search('',terms=values,site=site),terms)],'links':[]}
 CASES = CaseService(db,normalize,research,news_mentions,CONNECTORS,context_research,COLLECTORS)
+CASES.site_search=context_research
 CASES.llm=LOCAL_DRAFTS
 CASES.configuration=lambda:{'search':AUTOMATION.search_status(),'model':LOCAL_DRAFTS.status(),'contract_version':2}
 from investigation import InvestigationService, compare_reports

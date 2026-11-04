@@ -2,7 +2,7 @@
   <img src="docs/assets/vidocq-banner.svg" alt="Vidocq — Follow the evidence. Public indexes, local workspace." width="100%">
 </p>
 
-**2.18.0 audit update:** [Fixes, setup changes and validation limits](docs/AUDIT_FIXES.md).
+**2.19.0 discovery update:** [Twelve improvements to search coverage and evidence relevance](docs/DISCOVERY_QUALITY.md). [Earlier audit fixes and validation limits](docs/AUDIT_FIXES.md).
 
 <p align="center">
   <strong>A portable research workspace for Windows.</strong><br>
@@ -101,7 +101,7 @@ Use **Cases & reports** to supply identifiers, reference URLs, notes and selecte
 
 ## If you get zero results
 
-Open **Search connection** and run **Check public sources**. Source errors, empty results and missing connections are shown separately. Wikipedia and news indexes do not cover most people. For general mentions, enable free Mwmbl or provide your optional Brave key, then rerun research or create a new report snapshot. Brave keys stay in memory for the session; optional `VIDOCQ_BRAVE_API_KEY` configuration is managed by you. Index searches request snippets and do not follow original result URLs. Direct Steam/Osintgram APIs require separate permission.
+Open **Search connection** and run **Check public sources**. Source errors, empty results and missing connections are shown separately. Wikipedia and news indexes do not cover most people. For general mentions, enable free Mwmbl or provide your optional Brave key, then rerun research or create a new report snapshot. Search keys save with Windows encryption by default and restore after restart/update; uncheck Save for a session-only connection. Optional `VIDOCQ_BRAVE_API_KEY` configuration is managed by you. Index searches request snippets and do not follow original result URLs. Direct Steam/Osintgram APIs require separate permission.
 
 Brave is optional; account requirements, pricing and quotas are controlled by its provider. Review [pricing and signup conditions](https://api-dashboard.search.brave.com/documentation/resources/help-feedback) before enabling. Vidocq limits requests to 100 per app session; this is not a billing guarantee. No Brave account or key is included.
 

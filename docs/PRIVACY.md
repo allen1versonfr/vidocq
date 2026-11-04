@@ -1,6 +1,6 @@
 # Data and privacy
 
-Browser-reviewed excerpts and account decisions/history stay in the local SQLite workspace and user-created exports/backups. Captures are user-supplied, never silently fetched. Burn deletes only previewed paths after typed confirmation; external exports and browser/OS/provider records remain outside its scope. See [review and burn scope](REVIEW_AND_BURN.md). This release does not download or run a language model.
+Browser-reviewed excerpts and account decisions/history stay in the local SQLite workspace and user-created exports/backups. Captures are user-supplied, never silently fetched. Burn deletes only previewed paths after typed confirmation; external exports and browser/OS/provider records remain outside its scope. See [review and burn scope](REVIEW_AND_BURN.md). Optional managed local AI downloads require setup approval; approved case excerpts are processed locally without a cloud-model fallback.
 
 [← Project overview](../README.md)
 
@@ -13,7 +13,7 @@ Browser-reviewed excerpts and account decisions/history stay in the local SQLite
 | Text queries | Not automatically saved as findings. Saving a returned record includes query context in the finding. |
 | JSON exports | Written where your browser or native download dialog saves them; contain saved findings and source references. |
 | Image files and SauceNAO keys | Not intentionally persisted by the app. Image-search source references can be saved as notebook findings. |
-| Brave Search API key | Held in process memory only; optional `VIDOCQ_BRAVE_API_KEY` environment variable is managed by you. Sent only to the fixed Brave API host, never included in cases/reports. |
+| Brave/Search provider API keys | Saved with Windows-user-bound DPAPI encryption by default, outside the executable and case database; restored after restart/update. Uncheck Save for session-only use; Clear saved connection removes the selected stored key. Sent only to the selected fixed provider endpoint, never included in cases/reports. Optional `VIDOCQ_BRAVE_API_KEY` environment configuration is managed by you. |
 | GitHub token entered in Updates | Kept in process memory for the session; not written into the notebook or update jobs. |
 | `VIDOCQ_GITHUB_TOKEN` | Optional OS environment variable managed by you; persistent storage, if configured, is outside the app. |
 | Diagnostics | `startup.log` and `update-result.json` in the data folder. Review before sharing. |

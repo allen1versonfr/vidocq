@@ -1,6 +1,10 @@
 """URL-level evidence types. Classification never establishes ownership."""
 from urllib.parse import urlparse
 from profile_registry import account_identity,parsed_public,canonical_reference,HOST_ALIASES,PROFILE_HOSTS,DISCOVERY_ROUTES,NAVIGATION
+import re,unicodedata
+
+DIRECTORY_HOSTS={'whitepages.com','veripages.com','officialusa.com','searchpeoplefree.com','idcrawl.com','fastpeoplesearch.com','truepeoplesearch.com','spokeo.com','beenverified.com'}
+LISTING_HOSTS={'magicbricks.com','99acres.com','housing.com','zillow.com','realtor.com','redfin.com'}
 
 
 def source_quality(record):
@@ -10,6 +14,8 @@ def source_quality(record):
         p=urlparse(ref);host=(p.hostname or '').lower().removeprefix('www.')
         host=HOST_ALIASES.get(host,host)
         parts=p.path.strip('/').split('/')
+        for domains,kind,reason in [(DIRECTORY_HOSTS,'directory_page','People directory results do not establish a matching identity.'),(LISTING_HOSTS,'commercial_listing','Property listings are outside public-account discovery evidence.')]:
+            if any(host==d or host.endswith('.'+d) for d in domains):return {'kind':kind,'account_candidate':False,'usable_for_ai':False,'reason':reason}
         if host in PROFILE_HOSTS and parts[0].lower() in DISCOVERY_ROUTES and parts[0].lower() in NAVIGATION.get(host,DISCOVERY_ROUTES):
             return {'kind':'discovery_page','account_candidate':False,'usable_for_ai':False,'reason':'Search/category page; name lists do not establish relationships.'}
         profile=bool(account_identity(ref))
@@ -19,16 +25,39 @@ def source_quality(record):
         return {'kind':'unknown','account_candidate':False,'usable_for_ai':False,'reason':'Missing or invalid source URL.'}
 
 
-def ranked_ai_records(records):
-    eligible=[r for r in records if r.get('analyst_status')!='Rejected' and source_quality(r)['usable_for_ai']]
+def evidence_gate(record,case=None):
+    quality=source_quality(record)
+    if record.get('analyst_status')=='Rejected':return {'eligible':False,'reason':'Analyst rejected this source.','strength':0}
+    if not quality['usable_for_ai']:return {'eligible':False,'reason':quality['reason'],'strength':0}
+    if case is None:return {'eligible':True,'reason':'Provenance filter only; no case context supplied.','strength':1}
+    if record.get('analyst_status')=='Confirmed':return {'eligible':True,'reason':'Analyst-confirmed evidence; retain source citations.','strength':4}
+    def norm(s):return ' '.join(unicodedata.normalize('NFKC',str(s)).casefold().split())
+    blob=norm(record.get('title','')+'\n'+record.get('detail','')+'\n'+record.get('reference',''))
+    def match(v):return bool(v and re.search(r'(?<!\w)'+re.escape(norm(v).lstrip('@'))+r'(?!\w)',blob))
+    supplied=list(case.get('urls',[]))+list(case.get('steam',[]))
+    from social_profiles import profile_reference
+    supplied += [profile_reference(p,h) for p in ('instagram','tiktok','vsco') for h in case.get(p,[])]
+    try:anchor=canonical_reference(record.get('reference','')) in {canonical_reference(v) for v in supplied}
+    except ValueError:anchor=False
+    handle=any(match(v) for f in ('usernames','instagram','tiktok','vsco','emails') for v in case.get(f,[]))
+    name=any(match(v) or (len(v.split())>2 and match(v.split()[0]+' '+v.split()[-1])) for v in case.get('names',[])+case.get('spelling_variants',[]))
+    if anchor or handle:return {'eligible':True,'reason':'Matches an exact supplied account reference or identifier; ownership unverified.','strength':3}
+    if name:return {'eligible':True,'reason':'Matching name only; a namesake is possible.','strength':1}
+    return {'eligible':False,'reason':'No complete supplied name, identifier or account reference matched.','strength':0}
+
+def ranked_ai_records(records,case=None):
+    eligible=[r for r in records if evidence_gate(r,case)['eligible']]
     def score(r):
         relevance=r.get('relevance',{})
-        return (bool(r.get('observations',{}).get('profile')),bool(relevance.get('strong_anchor')),
-                len(relevance.get('matched_identifiers',[])),source_quality(r)['account_candidate'])
-    ordered=sorted(eligible,key=score,reverse=True);seen=set();result=[]
+        return (evidence_gate(r,case)['strength'],bool(r.get('observations',{}).get('profile')),bool(relevance.get('strong_anchor')),
+                len(relevance.get('matched_identifiers',[])),source_quality(r)['account_candidate'],len(r.get('detail','')))
+    ordered=sorted(eligible,key=score,reverse=True);seen=set();seen_text=set();result=[]
     for record in ordered:
         try:key=canonical_reference(record.get('reference',''))
         except ValueError:key=record.get('id')
-        if key in seen:continue
-        seen.add(key);result.append(record)
+        text=' '.join(record.get('detail','').casefold().split())
+        if key in seen or (len(text)>=60 and text in seen_text):continue
+        seen.add(key)
+        if len(text)>=60:seen_text.add(text)
+        result.append(record)
     return result

@@ -78,7 +78,7 @@ class AutomationSetup:
         state=self.web.configure(payload)
         if remember and not p.get('forget_saved'):
             if provider!='mwmbl':self.vault.save_search(provider,payload.get('key',''))
-            prefs={'provider':provider,'enabled':state['enabled'],'session_limit':state['session_limit']}
+            prefs={'provider':provider,'enabled':state['enabled'],'session_limit':state['session_limit'],'brave_result_limit':state.get('brave_result_limit',10)}
             temp=safe_path(self.search_path.with_name('search-connection.json.part'));temp.write_text(json.dumps(prefs),encoding='utf-8');temp.replace(safe_path(self.search_path))
         if p.get('forget_saved') is True:
             if provider in ('brave','serper','serpapi'):self.vault.save_search(provider,'')

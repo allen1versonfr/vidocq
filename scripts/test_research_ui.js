@@ -36,6 +36,7 @@ async function flush(){for(let i=0;i<12;i++)await Promise.resolve()}
   el('connection-key').value='must-not-cross-provider';el('connection-provider').value='mwmbl';el('connection-provider').onchange();assert.equal(el('connection-key').value,'');
   await el('connection-form').onsubmit(event);assert.equal(calls.filter(c=>c.url==='/api/search-connection'&&c.p?.provider==='mwmbl').at(-1).p.key,undefined);
   el('case-title').value='Synthetic case';const payload=vm.runInContext('casePayload()',context);assert.equal(payload.investigation.adaptive_queries,true);assert.equal(payload.investigation.ai_assessment,true);
+  assert.equal(payload.investigation.platform_searches,4);assert.equal(el('search-result-limit').value,'10');
   await el('workflow-plan').onclick();assert.match(el('workflow-queries').textContent,/Example/);
   el('profile-reference').value='https://github.com/publicfixture';el('profile-biography').value='Reviewed public biography';el('profile-reviewed').checked=true;
   el('profile-evidence-form').onsubmit(event);await flush();assert(calls.some(c=>c.url.endsWith('/profile-capture')&&c.p.public_reviewed===true));

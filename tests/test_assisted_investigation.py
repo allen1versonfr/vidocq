@@ -102,7 +102,7 @@ class InvestigationUnitTests(unittest.TestCase):
         case={'names':['Ann'],'emails':['sample@example.com']}
         result=relevance(case,{'title':'Joanne','detail':'Other person','source':'https://index.example/?q=sample@example.com'})
         self.assertFalse(result['can_expand']);self.assertEqual(result['matched_identifiers'],[])
-        result=relevance({'names':['Example Person'],'phones':['+12025550123']},{'title':'Example Person','detail':'Phone +1 (202) 555-0123'})
+        result=relevance({'names':['Example Person'],'phones':['+12025550123']},{'title':'Example Person','detail':'Phone +1 (202) 555-0123','reference':'https://example.org/bio'})
         self.assertEqual(len(result['matched_identifiers']),2);self.assertTrue(result['can_expand'])
     def test_identical_handles_are_not_independent_identifiers(self):
         r=relevance({'usernames':['example'],'instagram':['example'],'tiktok':['example']},{'title':'example','detail':''})

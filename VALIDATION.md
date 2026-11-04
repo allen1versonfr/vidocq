@@ -1,3 +1,13 @@
+# Validation for Vidocq 2.19.0
+
+327 Python tests pass locally (one Windows symlink-capability skip). New synthetic tests verify unsuitable-source exclusion, complete-identifier gating and no-call abstention, supplied-profile anchors, possible-namesake labels on quotations, richer-resource and syndicated-excerpt deduplication, effective-query normalization, bounded platform-index fallback, zero-limit behavior, content-author parent citations and strict LinkedIn/Hudl profile shapes. Optional Brave depth fixtures retain ranks through 20, distinguish depth caches, and restore saved depth across setup instances. DOM fixtures cover platform/depth controls.
+
+A real local Qwen run on synthetic evidence returned valid planning, explicit-link abstention, one cited verbatim excerpt and finite next actions. Offline analysis of sealed private artifacts used no network and left inputs/reports unchanged; no new discovery score is inferred. The initial full test run encountered a transient Windows connection abort in an existing HTTP rejection test; the isolated retry and final full suite passed. Release CI repeats vulnerability/public-canary/Windows packaging, restore, replacement, restart, rollback and disposable cleanup gates. Actual updated-executable checks include saved Brave result depth with search disabled.
+
+Private-person/paid searches were not rerun for this release. Native visual validation and real operator Instagram authentication remain outside this validation.
+
+Previous validation:
+
 # Validation for Vidocq 2.18.1
 
 310 Python tests pass locally (one Windows symlink-capability skip). Real Windows DPAPI tests verify default Brave persistence across a fresh setup instance, no network calls during restore, explicit session-only storage avoidance, forgetting, and saving the active key after rotation. DOM fixtures verify that the persistence checkbox starts checked and instructions describe restart/update restoration. Release smoke checks start a fresh actually updated executable against preserved data and assert the encrypted Brave key and disabled preference restore without provider calls. No private-person or paid search queries are used.

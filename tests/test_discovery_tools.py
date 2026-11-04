@@ -66,7 +66,7 @@ class LinkCaseTests(unittest.TestCase):
 class DraftTests(unittest.TestCase):
     def setUp(self):
         self.client=LocalDrafts();self.client.configure({'enabled':True,'port':8080,'model':'local'})
-        self.case={'names':['Ada Lovelace']};self.run={'records':[{'id':'R1','detail':'A published public source excerpt.','reference':'https://example.org'}]}
+        self.case={'names':['Ada Lovelace']};self.run={'records':[{'id':'R1','detail':'A published public source excerpt.','reference':'https://example.org','analyst_status':'Confirmed'}]}
     def generate(self,result,mode='summary'):
         class Response:
             def __enter__(self):return self

@@ -27,6 +27,20 @@ class SearchTests(unittest.TestCase):
    with patch('web_search.build_opener',return_value=self.response(data)):
     with self.assertRaises(ValueError):self.client.search('Example')
   with patch('web_search.build_opener',return_value=self.response({'query':{}})):self.assertEqual(self.client.search('Example')[1],[])
+ def test_optional_twenty_results_preserve_deep_ranks_and_separate_cache(self):
+  from urllib.parse import urlparse,parse_qs
+  self.client.configure({'key':'synthetic-key','enabled':True})
+  items=[{'title':'Public fixture '+str(i),'description':'Public index snippet','url':'https://example.org/profile/'+str(i)} for i in range(1,21)]
+  opener=self.response({'query':{},'web':{'results':items}})
+  with patch('web_search.build_opener',return_value=opener):
+   shallow=self.client.search('Fixture');self.assertEqual(len(shallow[1]),10)
+   self.client.configure({'enabled':True,'brave_result_limit':20})
+   deep=self.client.search('Fixture');self.assertEqual(len(deep[1]),20)
+  self.assertEqual(deep[1][-1]['index_rank'],20);self.assertEqual(deep.diagnostics['result_limit'],20)
+  self.assertEqual(opener.open.call_count,2);self.assertEqual(parse_qs(urlparse(opener.open.call_args.args[0].full_url).query)['count'],['20'])
+  with patch('web_search.build_opener') as network:self.assertTrue(self.client.search('fixture').diagnostics['cache_hit']);network.assert_not_called()
+  for bad in [0,21,True,'20']:
+   with self.assertRaises(ValueError):self.client.configure({'enabled':True,'brave_result_limit':bad})
  def test_auth_rate_and_outage_are_errors(self):
   self.client.configure({'key':'secret-key','enabled':True})
   for code in (401,403,429,503):

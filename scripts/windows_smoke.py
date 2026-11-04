@@ -333,6 +333,7 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
             time.sleep(.25)
         assert state['key_configured'] and state['key_saved'] and not state['enabled']
         assert state['next_start_provider']=='brave' and 'synthetic-frozen-brave-key' not in json.dumps(state)
+        assert state['brave_result_limit']==20
         assert Vault(root/'data').search_key('brave')=='synthetic-frozen-brave-key'
         print('Actual updated executable restored the encrypted Brave key and disabled preference without provider calls.')
     finally:
