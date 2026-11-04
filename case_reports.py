@@ -67,6 +67,9 @@ def clean_case(payload,normalize):
         result[field]=value.strip()
     result['locations']=locations(payload)
     result['aliases']=aliases(payload.get('aliases',[]))
+    spellings=payload.get('spelling_variants',[])
+    if not isinstance(spellings,list) or len(spellings)>10 or any(not isinstance(s,str) or not s.strip() or len(s)>120 or any(ord(c)<32 for c in s) for s in spellings):raise ValueError('Use up to ten approved name variants.')
+    result['spelling_variants']=list(dict.fromkeys(s.strip() for s in spellings))
     total=0
     for field in FIELDS:
         values=payload.get(field,[])
@@ -102,6 +105,7 @@ class CaseService:
         self.lock=threading.RLock();self.active=None
         self.cancel_flags={};self.connectors=connectors
         self.collectors=collectors
+        self.llm=None
         self.context_search=context_search or (lambda terms:{'results':[{'provider':'Context web search','status':'not-configured','message':'Context index search is not connected.','rows':[]}],'links':[]})
     def initialize(self):
         with self.database() as db:
@@ -129,6 +133,7 @@ class CaseService:
         previous=self.get(key)
         data=clean_case(payload,self.normalize)
         if 'aliases' not in payload:data['aliases']=previous.get('aliases',[])
+        if 'spelling_variants' not in payload:data['spelling_variants']=previous.get('spelling_variants',[])
         data.update(id=key,created_at=previous['created_at'],account_decisions=previous.get('account_decisions',[]))
         with self.database() as db:db.execute('UPDATE cases SET data=?,updated_at=? WHERE id=?',(json.dumps(data),now(),key))
         return data

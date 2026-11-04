@@ -1,16 +1,16 @@
-# Managed local AI setup (2.15)
+# Managed local AI setup (2.16)
 
 Vidocq remains a portable Windows application. Its first-run notice and Updates screen open **Search connection → Install recommended local AI**. No separate Python, terminal commands, API account or paid service are required. The base executable does not contain model weights.
 
 1. Read the download size/licenses, choose Vulkan (recommended for Radeon RX 7600 XT) or CPU, and approve setup.
 2. Click **Install / repair local AI**. Vidocq downloads/verifies llama.cpp b12079 and Qwen3-4B-Instruct-2507 Q4_K_M (about 2.54 GB combined; allow about 3 GB free disk space). Progress is shown. Cancel leaves partial downloads for a later retry; cancellation can wait for an in-flight network operation (30-second socket timeout) or model check (45-second timeout).
-3. Setup checks a synthetic response without case data, stops that test runtime to free memory, and enables on-demand local drafts. Each real draft still needs its own approval.
+3. Setup checks a synthetic response without case data, stops that test runtime to free memory, and enables on-demand local drafts. Manual drafts need their own approval. AI-assisted cases approve bounded planning/search/link-selection/synthesis through their case settings.
 
 Your 16 GB RAM/Radeon configuration should suit this small model. Vulkan uses available compatible GPUs; CPU is retried if GPU startup fails. Existing graphics drivers and Windows runtime support are required; setup does not install drivers or system redistributables. If neither backend starts, Vidocq reports failure and leaves the AI disabled. No cloud fallback is used. This is a starting hardware profile, not a guarantee of performance on every driver/PC.
 
 ## Updates and storage
 
-Model/runtime files live in the workspace's `local-ai` directory and preferences in `local-ai.json`. App executable updates and rollback leave these files intact. On restart settings are restored but no server starts until an approved draft. **Use installed AI** re-enables it, **Disable and stop AI** releases its process without deleting downloaded files. A normal app update never silently downloads a model/runtime replacement. Setup checks pinned versions and reuses verified files; future asset changes need the explicit setup/repair action.
+Model/runtime files live in the workspace's `local-ai` directory and preferences in `local-ai.json`. App executable updates and rollback leave these files intact. On restart settings are restored but no server starts until an approved draft or AI-assisted case. **Use installed AI** re-enables it, **Disable and stop AI** releases its process without deleting downloaded files. A normal app update never silently downloads a model/runtime replacement. Setup checks pinned versions and reuses verified files; future asset changes need the explicit setup/repair action.
 
 Runtime/model URLs, revisions, byte counts, ZIP member inventory and SHA-256 values are pinned in `local_ai_assets.py`. Downloads accept only reviewed GitHub/Hugging Face hosts, validate range responses when resuming, and install files only after checksum verification. Runtime executable/DLLs and the model are reverified before starting a new managed process. Extra unowned DLLs/executables cause refusal rather than being loaded or deleted. Repair replaces known damaged files; move unrelated executable files out of the managed runtime folder yourself.
 
@@ -28,3 +28,7 @@ Burn Vidocq previews known managed model/runtime/configuration/partial-download 
 ## Validation
 
 Unit tests use tiny synthetic downloads to exercise resume/restart, checksum refusal, cancellation, safe extraction, persisted settings, on-demand startup, CPU fallback and lifecycle protection. Frozen CI checks approval/default-off APIs and preservation of synthetic AI files across app replacement and rollback without downloading 2.5 GB per build. An optional local test, `scripts/live_local_ai_smoke.py --data .test-data/real-local-ai/data`, exercises actual inference/auth/lifecycle with an already installed disposable model. It refuses live workspace paths. Real local tests use only synthetic case content; these checks are not investigation accuracy benchmarks.
+
+## AI-assisted cases
+
+Enable AI-assisted investigation in a case to execute validated selections from supplied query combinations, select explicit cited profile links, and draft source-based findings. Search/follow-up limits and source permissions still apply. Read [the pipeline and validation limits](AUTOMATED_SETUP.md#the-ai-now-participates-in-a-case).

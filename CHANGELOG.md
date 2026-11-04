@@ -1,3 +1,7 @@
+# 2.16.0
+
+Added managed collector/startup setup, encrypted Osintgram provider credentials, native reviewed-browser relay, active bounded local-AI planning/search/link/synthesis, explicit-link follow-ups, dated checker quarantine and clearer incomplete-coverage reports. See docs/AUTOMATED_SETUP.md.
+
 # 2.15.0
 
 Added optional managed local AI setup in first-run/Updates flows, pinned resumable downloads, automatic authenticated runtime startup, Vulkan/CPU fallback, persisted settings/assets, real-model checks and guarded managed-file deletion. See docs/LOCAL_AI_SETUP.md.

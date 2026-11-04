@@ -229,7 +229,8 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
                 context=json.loads(payload['messages'][1]['content'])
                 if 'queries' in context:result={'indexes':[0]}
                 else:
-                    row=context['records'][0];result={'claims':[{'citation':row['id'],'quote':row['excerpt'][:40]}]}
+                    row=context['records'][0];result={'claims':[{'citation':row['id'],'quote':row['excerpt'][:40],'text':'The source contains this quoted public excerpt.'}]}
+                    if '"leads"' in payload['messages'][0]['content']:result={'leads':[]}
                 self.reply({'choices':[{'message':{'content':json.dumps(result)}}]})
         model_fixture=ThreadingHTTPServer(('127.0.0.1',0),ModelFixture);threading.Thread(target=model_fixture.serve_forever,daemon=True).start()
         try:
@@ -244,10 +245,24 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
             assert len(discovery_report['link_evidence'])==2
             with request(discovery_path+'/local-draft',{'mode':'summary','run_id':discovery_run['id'],'consent':True}) as response:assert json.load(response)['claims'][0]['citation'] in {r['id'] for r in discovery_report['records']}
             with request('/api/case-runs/'+discovery_run['id']+'?format=html') as response:assert b'photon-aggregate-lead' in response.read()
+            ai_case={**discovery_case,'usernames':['publicfixture'],'investigation':{'enabled':True,'ai_assisted':True,'max_searches':10,'max_followups':0}}
+            with request(discovery_path,ai_case) as response:json.load(response)
+            with request(discovery_path+'/run',{'consent':True}) as response:ai_run=json.load(response)
+            deadline=time.monotonic()+45
+            while True:
+                with request('/api/case-runs/'+ai_run['id']) as response:ai_report=json.load(response)
+                if ai_report['status']=='complete':break
+                assert time.monotonic()<deadline;time.sleep(.1)
+            assert ai_report['ai']['executed_queries']>0 and ai_report['ai']['summary']['claims'],ai_report['ai']
+            assert any(t['origin']=='local-ai-approved-query-plan' for t in ai_report['search_log'])
+            assert ai_report['coverage_assessment']['status']=='incomplete'
+            with request('/api/case-runs/'+ai_run['id']+'?format=markdown') as response:assert b'AI-assisted findings' in response.read()
         finally:
             model_fixture.shutdown();model_fixture.server_close()
             with request('/api/local-drafts',{'enabled':False,'port':8080,'model':'local'}) as response:assert not json.load(response)['enabled']
         print('Frozen browser/Photon imports, historical aliases, link reports and local model fixture passed.')
+        from automation_smoke import check as check_automation
+        check_automation(request,root,exe,env)
         with request('/api/workspace/backup',{'password':'synthetic backup password'}) as response:bundle=json.load(response)
         assert bundle['encrypted']
         with request('/api/workspace/restore',dict(bundle,password='synthetic backup password')) as response:preview=json.load(response)
@@ -262,7 +277,9 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
     ai_fixture=root/'data'/'local-ai';ai_fixture.mkdir(exist_ok=True)
     (ai_fixture/MODEL['filename']).write_bytes(b'synthetic model preservation fixture')
     (root/'data'/'local-ai.json').write_text('{"enabled":false,"backend":"cpu"}')
-    ai_snapshots={p:hashlib.sha256(p.read_bytes()).hexdigest() for p in (ai_fixture/MODEL['filename'],root/'data'/'local-ai.json')}
+    from credential_vault import Vault
+    Vault(root/'data').save('synthetic-persistence-key-not-for-provider-calls')
+    ai_snapshots={p:hashlib.sha256(p.read_bytes()).hexdigest() for p in (ai_fixture/MODEL['filename'],root/'data'/'local-ai.json',root/'data/credentials.dpapi',root/'data/automations.json')}
     for scenario in ('success', 'rollback'):
         folder=root/scenario;folder.mkdir()
         target=folder/'Vidocq.exe';shutil.copyfile(exe,target)

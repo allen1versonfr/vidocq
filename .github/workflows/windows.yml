@@ -17,6 +17,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
+          python-version: '3.14'
+      - name: Build pinned isolated collector companions and corresponding source
+        run: python scripts/build_collectors.py
+      - uses: actions/setup-python@v5
+        with:
           python-version: '3.12'
       - name: Install pinned build dependencies
         run: python -m pip install -r requirements.txt pyinstaller==6.20.0
@@ -36,6 +41,7 @@ jobs:
           node --check ui/review.js
           node --check ui/workbench.js
           node --check ui/local-ai.js
+          node --check ui/automation.js
           node --check browser-extension/popup.js
           node scripts/test_browser_capture.js
       - name: Build portable Windows executable

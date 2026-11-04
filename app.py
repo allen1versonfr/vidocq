@@ -38,6 +38,12 @@ BURN = BurnManager(DATA)
 from managed_local_ai import ManagedLocalAI
 LOCAL_AI = ManagedLocalAI(DATA)
 LOCAL_DRAFTS.manager=LOCAL_AI
+from automation_setup import AutomationSetup
+from browser_bridge import BrowserBridge,parse_capture,register as register_browser,unregister as unregister_browser
+AUTOMATION=AutomationSetup(DATA,WEB_SEARCH,COLLECTORS,CONNECTORS,LOCAL_AI)
+BROWSER_BRIDGE=BrowserBridge(DATA)
+from checker_health import CheckerHealth
+CHECKER_HEALTH=CheckerHealth(DATA,COLLECTORS)
 NETWORK_HOSTS = frozenset({'archive.org', 'crt.sh', 'en.wikipedia.org', 'rdap.arin.net', 'rdap.db.ripe.net', 'rdap.apnic.net', 'rdap.lacnic.net', 'rdap.afrinic.net', 'openlibrary.org', 'api.gdeltproject.org'})
 LINK_HOSTS = NETWORK_HOSTS | {'www.google.com', 'www.bing.com', 'lookup.icann.org', 'stat.ripe.net', 'duckduckgo.com', 'scholar.google.com', 'pubmed.ncbi.nlm.nih.gov', 'patents.google.com'}
 COOKIE = secrets.token_urlsafe(32)
@@ -270,6 +276,7 @@ from case_reports import CaseService,report_html,report_markdown
 def context_research(terms):
     return {'results':[run_adapter(WEB_SEARCH.label()+' context',lambda values:WEB_SEARCH.search_terms(values),terms)],'links':[]}
 CASES = CaseService(db,normalize,research,news_mentions,CONNECTORS,context_research,COLLECTORS)
+CASES.llm=LOCAL_DRAFTS
 from investigation import InvestigationService, compare_reports
 INVESTIGATION = InvestigationService(db)
 
@@ -310,6 +317,11 @@ class Handler(BaseHTTPRequestHandler):
         if route=='/workbench.js':return self.send(200,(ROOT/'ui/workbench.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/api/local-drafts':return self.send(200,LOCAL_DRAFTS.status())
         if route=='/api/local-ai':return self.send(200,LOCAL_AI.status())
+        if route=='/api/automation':return self.send(200,AUTOMATION.status())
+        if route=='/api/automation/licenses':return self.send(200,{'text':(AUTOMATION.manager.bundle/'LICENSES.txt').read_text(encoding='utf-8')})
+        if route=='/api/checker-controls':return self.send(200,CHECKER_HEALTH.status())
+        if route=='/automation.js':return self.send(200,(ROOT/'ui/automation.js').read_bytes(),'application/javascript; charset=utf-8')
+        if route=='/api/browser-pending':return self.send(200,BROWSER_BRIDGE.list())
         if route=='/api/local-ai/licenses':return self.send(200,{'text':(ROOT/'docs/LOCAL_AI_LICENSES.txt').read_text(encoding='utf-8')})
         if route=='/local-ai.js':return self.send(200,(ROOT/'ui/local-ai.js').read_bytes(),'application/javascript; charset=utf-8')
         if route=='/review.js':return self.send(200,(ROOT/'ui/review.js').read_bytes(),'application/javascript; charset=utf-8')
@@ -357,6 +369,16 @@ class Handler(BaseHTTPRequestHandler):
         self.send(404,{'error':'Not found.'})
 
     def do_POST(self):
+        if self.path=='/api/browser-relay':
+            import hmac
+            if self.headers.get('Host')!='127.0.0.1:'+str(self.server.server_port) or self.headers.get('Origin') or not hmac.compare_digest(self.headers.get('X-Vidocq-Relay',''),BROWSER_BRIDGE.key):return self.send(403,{'error':'Invalid native capture relay.'})
+            try:
+                size=int(self.headers.get('Content-Length','0'))
+                if not 1<=size<=100000:raise ValueError('Invalid capture size.')
+                p=json.loads(self.rfile.read(size));CASES.get(p.get('case_id',''))
+                if BURN.pending:raise ValueError('Workspace deletion is pending.')
+                return self.send(202,BROWSER_BRIDGE.receive(p))
+            except (ValueError,TypeError,AttributeError):return self.send(400,{'error':'Invalid capture payload.'})
         if not self.authorized():return self.send(403,{'error':'Invalid local session or origin.'})
         try:
             size=int(self.headers.get('Content-Length','0'))
@@ -365,6 +387,34 @@ class Handler(BaseHTTPRequestHandler):
             p=json.loads(self.rfile.read(size))
             if not isinstance(p,dict):raise ValueError('Invalid request.')
             if BURN.pending:return self.send(409,{'error':'Vidocq burn is pending; new writes are disabled.'})
+            if self.path=='/api/automation':
+                if CASES.active:raise ValueError('Finish or cancel the active case before changing tool setup.')
+                result=AUTOMATION.apply(p)
+                if p.get('browser') is True:
+                    try:AUTOMATION.messages['browser']=register_browser()['notice']
+                    except (ValueError,OSError):AUTOMATION.messages['browser']='Browser registration requires the Windows release. Native browser approval may still be required.'
+                return self.send(202,AUTOMATION.status())
+            if self.path=='/api/automation/credentials':
+                if CASES.active:raise ValueError('Finish or cancel the active case before changing credentials.')
+                return self.send(200,AUTOMATION.credentials(p))
+            if self.path=='/api/checker-controls':
+                if CASES.active:raise ValueError('Finish the active investigation before validating a checker.')
+                return self.send(200,CHECKER_HEALTH.run(p))
+            if self.path=='/api/browser-helper/setup':return self.send(200,register_browser())
+            if self.path=='/api/browser-capture/review':
+                if p.get('consent') is not True:raise ValueError('Review and approve captured evidence first.')
+                item=BROWSER_BRIDGE.peek(p.get('id',''))
+                from discovery_tools import import_links
+                data=import_links({'mode':'browser','data':item['data']})
+                result=CASES.link_capture(item['case_id'],data,INVESTIGATION.save_finding)
+                BROWSER_BRIDGE.pop(item['id'])
+                return self.send(201,result)
+            if self.path=='/api/photon/crawl':
+                if p.get('consent') is not True:raise ValueError('Approve direct requests to the supplied public website.')
+                AUTOMATION.manager.ensure('photon')
+                result=AUTOMATION.manager.request('photon','/api/crawl',p,timeout=90)
+                if p.get('case_id'):CASES.link_capture(p['case_id'],result,INVESTIGATION.save_finding)
+                return self.send(200,result)
             if self.path=='/api/local-drafts':return self.send(200,LOCAL_DRAFTS.configure(p))
             if self.path=='/api/local-ai/setup':return self.send(202,LOCAL_AI.setup(p.get('consent'),p.get('backend','vulkan')))
             if self.path=='/api/local-ai/cancel':return self.send(200,LOCAL_AI.cancel())
@@ -384,13 +434,18 @@ class Handler(BaseHTTPRequestHandler):
                 finding=CASES.link_capture(key,data,INVESTIGATION.save_finding)
                 return self.send(201,{'evidence':finding,'result':data})
             if self.path=='/api/burn/preview':
+                if AUTOMATION.status()['busy']:raise ValueError('Wait for automatic setup to finish before deletion.')
                 if LOCAL_AI.busy:raise ValueError('Wait for local AI setup to finish, or cancel it before deletion.')
                 if CASES.active or UPDATES.status()['phase'] in ('checking','downloading','applying'):raise ValueError('Wait for investigations and updates to finish before deletion.')
                 return self.send(200,BURN.preview(p.get('remove_executable',False)))
             if self.path=='/api/burn/execute':
+                if AUTOMATION.status()['busy']:raise ValueError('Wait for automatic setup to finish before deletion.')
                 if LOCAL_AI.busy:raise ValueError('Wait for local AI setup to finish, or cancel it before deletion.')
                 if CASES.active or UPDATES.status()['phase'] in ('checking','downloading','applying'):raise ValueError('Wait for investigations and updates to finish before deletion.')
-                LOCAL_AI.stop();result=BURN.execute(p);self.send(202,result)
+                LOCAL_AI.stop();result=BURN.execute(p);AUTOMATION.stop();BROWSER_BRIDGE.close()
+                try:unregister_browser()
+                except OSError:pass
+                self.send(202,result)
                 def finish_burn():
                     if COLLECTORS.manager:COLLECTORS.manager.stop()
                     os._exit(0)
@@ -463,6 +518,8 @@ class Handler(BaseHTTPRequestHandler):
                 UPDATES.download()
                 return self.send(202,UPDATES.status())
             if self.path=='/api/updates/install':
+                if AUTOMATION.status()['busy'] or CASES.active:raise ValueError('Wait for setup and case processing before installing updates.')
+                AUTOMATION.stop()
                 if LOCAL_AI.busy:raise ValueError('Wait for local AI setup to finish, or cancel it before installing an update.')
                 LOCAL_AI.stop()
                 UPDATES.install()
@@ -516,6 +573,7 @@ def main():
     parser.add_argument('--browser',action='store_true',help='Open in default browser instead of native window')
     parser.add_argument('--serve-only',action='store_true',help='Start local server for diagnostics')
     parser.add_argument('--port',type=int,default=0)
+    parser.add_argument('--browser-capture')
     args=parser.parse_args()
     migrate_legacy_data()
     CASES.initialize()
@@ -539,12 +597,16 @@ def main():
     server=ThreadingHTTPServer(('127.0.0.1',args.port),Handler)
     server.daemon_threads=True
     url=f'http://127.0.0.1:{server.server_port}'
+    BROWSER_BRIDGE.publish(server.server_port)
+    if args.browser_capture:BROWSER_BRIDGE.receive(parse_capture(args.browser_capture))
+    AUTOMATION.start()
     print('Vidocq is running at '+url,flush=True)
     print('Close the app window or press Ctrl+C here to stop.',flush=True)
     if args.serve_only:
         try:server.serve_forever()
         except KeyboardInterrupt:pass
         finally:
+            AUTOMATION.stop();BROWSER_BRIDGE.close()
             LOCAL_AI.stop()
             if COLLECTORS.manager:COLLECTORS.manager.stop()
             server.server_close()
@@ -577,6 +639,7 @@ def main():
                 EXIT_EVENT.wait()
     except KeyboardInterrupt:pass
     finally:
+        AUTOMATION.stop();BROWSER_BRIDGE.close()
         LOCAL_AI.stop()
         if COLLECTORS.manager:COLLECTORS.manager.stop()
         server.shutdown();server.server_close()

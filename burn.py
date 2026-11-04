@@ -10,11 +10,19 @@ import tempfile
 import time
 import threading
 
-OWNED_FILES=('workspace.sqlite3','workspace.sqlite3-wal','workspace.sqlite3-shm','workspace.sqlite3-journal','startup.log','update-result.json','.vidocq-owner.json','local-ai.json','local-ai.json.part')
+OWNED_FILES=('workspace.sqlite3','workspace.sqlite3-wal','workspace.sqlite3-shm','workspace.sqlite3-journal','startup.log','update-result.json','.vidocq-owner.json','local-ai.json','local-ai.json.part','credentials.dpapi','credentials.dpapi.part','automations.json','automations.json.part','browser-relay.json','checker-health.json')
 
 def owned_files(root):
     from managed_local_ai import owned_ai_files
-    return list(OWNED_FILES)+(owned_ai_files() if no_links(root/'local-ai').is_dir() else [])
+    names=list(OWNED_FILES)+(owned_ai_files() if no_links(root/'local-ai').is_dir() else [])
+    if no_links(root/'harvester').is_dir():
+        names+=['harvester/'+name+suffix for name in ('runs.sqlite','schedules.sqlite') for suffix in ('','-wal','-shm','-journal')]
+        artifacts=no_links(root/'harvester/run-artifacts')
+        if artifacts.is_dir():
+            import re
+            for directory in artifacts.iterdir():
+                if re.fullmatch('[0-9a-f-]{36}',directory.name) and no_links(directory).is_dir():names+=['harvester/run-artifacts/'+directory.name+'/'+name for name in ('evidence.json','evidence.json.tmp')]
+    return names
 
 def no_links(path):
     path=Path(path).absolute()

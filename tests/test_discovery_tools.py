@@ -92,3 +92,15 @@ class DraftTests(unittest.TestCase):
             self.client.enabled=False
             with self.assertRaises(ValueError):self.client.generate(self.case,self.run,'queries',True)
             opener.assert_not_called()
+    def test_engine_modes_validate_queries_links_and_synthesis(self):
+        self.case['usernames']=['publicfixture']
+        self.assertTrue(self.generate({'indexes':[0]},'planning')['queries'])
+        with self.assertRaises(ValueError):self.generate({'indexes':[True]},'planning')
+        self.run['records'][0]['detail']='A public bio links https://example.org/profile and reports 12 publications.'
+        self.assertEqual(self.generate({'leads':[{'citation':'R1','url':'https://example.org/profile'}]},'leads')['leads'][0]['citation'],'R1')
+        for citation,url in [('R1','https://example.org/invented'),('R2','https://example.org/profile')]:
+            with self.assertRaises(ValueError):self.generate({'leads':[{'citation':citation,'url':url}]},'leads')
+        claim={'citation':'R1','quote':'reports 12 publications','text':'The source reports 12 publications.'}
+        self.assertTrue(self.generate({'claims':[claim]},'synthesis')['draft'])
+        for text in ['The source reports 999 publications.','This account belongs to Example Person.','Contact invented@example.org.']:
+            with self.assertRaises(ValueError):self.generate({'claims':[{**claim,'text':text}]},'synthesis')

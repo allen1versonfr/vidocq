@@ -31,12 +31,13 @@ def normalize_steam(value):
         return 'https://steamcommunity.com/'+parts[0]+'/'+parts[1].lower()+'/'
     except ValueError:raise ValueError('Use a Steam profile URL, not a group, game or arbitrary website.') from None
 
-def read_json(url, payload=None, local=False, timeout=20):
+def read_json(url, payload=None, local=False, timeout=20, local_key=None):
     """Only fixed destinations constructed by this module may be requested."""
     p=urlparse(url)
     allowed=(p.scheme=='http' and p.hostname=='127.0.0.1' and p.path in ('/api/about','/api/run','/api/cancel') and p.port and 1024<=p.port<=65535) if local else (p.scheme=='https' and p.hostname in ('api.steampowered.com','communitybanlist.com') and p.port is None)
     if not allowed or p.username or p.password: raise ValueError('Connector destination is not reviewed.')
     headers={'Accept':'application/json','User-Agent':'Vidocq research connector'}
+    if local_key:headers['X-Vidocq-Key']=local_key
     data=None
     if payload is not None:headers['Content-Type']='application/json';data=json.dumps(payload).encode()
     try:
@@ -52,6 +53,7 @@ class ResearchConnectors:
     def __init__(self):
         self.lock=threading.RLock();self.steam_key='';self.steam_enabled=False;self.cbl=False
         self.osintgram_enabled=False;self.port=8000;self.requests={'steam':0,'osintgram':0};self.pending={};self.cancelled_runs=set()
+        self.managed_key=None;self.managed_manager=None;self.managed_vault=None
 
     def status(self):
         with self.lock:return {'steam':{'enabled':self.steam_enabled,'configured':bool(self.steam_key),'session_requests':self.requests['steam'],'session_limit':100,'cbl':self.cbl},
@@ -66,6 +68,8 @@ class ResearchConnectors:
             if not isinstance(candidate,str) or (candidate and not re.fullmatch('[A-Fa-f0-9]{32}',candidate)):raise ValueError('A Steam Web API key has 32 hexadecimal characters.')
             if enabled and not candidate:raise ValueError('Enter your Steam Web API key before enabling Steam.')
             self.steam_key=candidate;self.steam_enabled=enabled;self.osintgram_enabled=og;self.port=port;self.cbl=cbl
+        if self.managed_manager and (not og or port!=self.managed_manager.entries.get('osintgram',{}).get('port')):
+            self.managed_manager.stop('osintgram');self.managed_manager=None;self.managed_key=None;self.managed_vault=None
         return self.status()
 
     def _reserve(self,kind):
@@ -150,15 +154,19 @@ class ResearchConnectors:
             enabled=self.osintgram_enabled;port=self.port
             if run_id in self.cancelled_runs:raise ConnectorUnavailable('Osintgram run was cancelled before it started.')
         if not enabled:raise ConnectorUnavailable('Osintgram was not queried: enable the local Osintgram 2.x connection.')
+        if self.managed_manager:
+            self.managed_key,port=self.managed_manager.ensure('osintgram',self.managed_vault.load());self.port=port
         base='http://127.0.0.1:'+str(port)
-        about=read_json(base+'/api/about',local=True)
+        def local_request(path,payload=None,timeout=20):
+            return read_json(base+path,payload,local=True,timeout=timeout,**({'local_key':self.managed_key} if self.managed_key else {}))
+        about=local_request('/api/about')
         if not isinstance(about,dict) or about.get('repository')!='https://github.com/Datalux/Osintgram':raise ValueError('The selected local service does not identify itself as Osintgram 2.x.')
         self._reserve('osintgram');job='vidocq-'+secrets.token_hex(12)
         with self.lock:self.pending[job]=(run_id,base)
         try:
             def fetch_calls(selected,budget):
                 calls=[{'name':c,'args':{'limit_posts':5} if c in ('get_captions','get_hashtags') else {}} for c in selected]
-                response=read_json(base+'/api/run',{'target':handle,'calls':calls,'max_items':budget,'cache_ttl_seconds':3600,'run_id':job,'verbose':False},local=True,timeout=60)
+                response=local_request('/api/run',{'target':handle,'calls':calls,'max_items':budget,'cache_ttl_seconds':3600,'run_id':job,'verbose':False},timeout=60)
                 if not isinstance(response,dict) or not isinstance(response.get('target'),str) or response['target'].lower()!=handle or not isinstance(response.get('tool_calls'),list):raise ValueError('Osintgram returned an unexpected target or result format.')
                 return response
             data=fetch_calls(['get_user_info'],5)
@@ -211,7 +219,7 @@ class ResearchConnectors:
             with self.lock:self.pending.pop(job,None)
 
     def _cancel_job(self,base,job):
-        try:read_json(base+'/api/cancel',{'run_id':job},local=True,timeout=5)
+        try:read_json(base+'/api/cancel',{'run_id':job},local=True,timeout=5,local_key=self.managed_key if self.managed_manager else '')
         except ValueError:pass
 
     def cancel(self,run_id):

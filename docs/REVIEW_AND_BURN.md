@@ -29,3 +29,5 @@ The helper validates the dedicated data directory, ownership marker, named file 
 **Limits:** this is permanent file deletion, not guaranteed secure erasure from SSDs, filesystem journals, snapshots or backups. Exports/screenshots saved elsewhere, other executable copies, temporary updater downloads outside this workspace, browser history/download records, pinned shortcuts, OS/security logs, third-party tools/credentials and provider logs remain outside its scope. It does not modify Windows/browser history or security logs. On failure, details remain in the helper's temporary folder at the path provided by the closing message.
 
 Development and release deletion tests use disposable fixtures/copied executables only. The user's real workspace and installed executable are not burned during development.
+
+Version 2.16 also previews named automation settings, encrypted Osintgram credentials, checker-control records, the browser relay descriptor and scoped theHarvester databases/evidence artifacts. It unregisters only its matching Windows browser protocol handler. Unknown files in companion folders remain outside the deletion scope.
