@@ -1,3 +1,11 @@
+# Vidocq 2.17.2
+
+Repeated Brave queries now use a copy-safe 15-minute session cache, including when the network request cap is reached. Quota errors pause further requests for a minute. Requests use the fixed Brave endpoint without system proxies or redirects. Each completed response records provider/retained counts, original rank and reasons for filtering; report exports show those counts. Offline diagnostics distinguish an empty provider response from rows discarded by the adapter. Approved adaptive searches try separate supplied first/last name tokens before adding more constraints, within the original search budget.
+
+Validation: 278 Python tests pass locally (one Windows symlink skip), including synthetic cache/cap/quota, rank/filter/redaction and query-order regressions. No paid provider or private benchmark queries were made for this patch. Windows packaging validation runs in CI; no discovery-score improvement claimed.
+
+Previous release:
+
 # Vidocq 2.17.1
 
 This patch addresses noisy discovery results rather than adding providers. Generic social discovery pages remain visible as context but no longer inflate candidate counts, seed follow-ups, or enter AI claim/comparison context. Observed profiles and identifier matches get priority before the AI context limit. Reports distinguish candidate records from distinct candidate profile URLs. Empty and discovery-only searches can trigger approved bounded query variations. AI explanations use neutral labels beside validated quotations to avoid publishing model-inferred associations as source facts.

@@ -12,7 +12,10 @@ def variations(case):
             terms=[parts[0],parts[-1]]
             if tuple(terms) not in seen:result.append({'terms':terms,'reason':'separate supplied first/last name tokens'});seen.add(tuple(terms))
     base={tuple(q['terms']) for q in query_plan(case)}
-    return [q for q in result if tuple(q['terms']) not in base][:12]
+    remaining=[q for q in result if tuple(q['terms']) not in base]
+    # Relax the full-name phrase before adding more exact-match constraints.
+    remaining.sort(key=lambda q:q['reason']!='separate supplied first/last name tokens')
+    return remaining[:12]
 
 def review_plan(case,run=None):
     searched={tuple(x['value']) for x in (run or {}).get('search_log',[]) if x['kind']=='context' and x['status']=='completed'}

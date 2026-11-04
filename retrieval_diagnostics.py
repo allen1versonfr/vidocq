@@ -15,6 +15,7 @@ def diagnose_control(expected_url, report, retained_records=None):
     elif exact and retained_records is not None and not any(matches(r) for r in retained_records):stage='lost_after_retrieval'
     elif exact:stage='exact_profile_returned'
     elif any(p.get('status') not in ('ok','empty') for p in providers):stage='source_incomplete'
+    elif not rows and any(p.get('retrieval_diagnostics',{}).get('provider_rows',0)>0 for p in providers):stage='all_rows_filtered_by_adapter'
     elif not rows:stage='no_rows_returned'
     else:stage='target_not_in_returned_rows'
     return {'stage':stage,'exact_profile_returned':exact,'rows':len(rows),
