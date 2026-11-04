@@ -208,7 +208,7 @@ class AdditionalCollectors:
                 result_outcome=item.get('outcome',{'Claimed':'candidate','Available':'absent','Unknown':'unknown','Illegal':'invalid-handle'}[item['status']])
                 if result_outcome not in ('candidate','absent','unknown','invalid-handle','unsupported','cancelled','timeout','blocked','error'):raise ValueError('Maigret returned an unknown diagnostic outcome.')
                 reason={'candidate':'Matching account candidate; ownership not established.','absent':'No account detected; not proof of absence.','unknown':'No reliable result or diagnostic.','invalid-handle':'Handle unsupported by site.','unsupported':'Checker unavailable in reviewed database.','cancelled':'Check cancelled.','timeout':'Deadline exceeded.','blocked':'Access/challenge/rate restriction.','error':'Check failed.'}[result_outcome]
-                checks.append({'site':item['site'],'status':item['status'],'outcome':result_outcome,'reason':reason})
+                checks.append({'site':item['site'],'status':item['status'],'outcome':result_outcome,'reason':reason,'diagnostics':{k:v for k,v in item.get('diagnostics',{}).items() if k in ('checked_at','error_type','maigret_version','checker_sha256','fresh_check','http_status') and isinstance(v,(str,int,bool))} if isinstance(item.get('diagnostics'),dict) else {}})
                 if (item['status']=='Claimed' and result_outcome!='candidate') or (item['status']=='Available' and result_outcome!='absent'):raise ValueError('Maigret returned inconsistent site diagnostics.')
                 failed=failed or result_outcome not in ('candidate','absent')
                 if item['status']!='Claimed':continue

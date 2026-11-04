@@ -1,5 +1,7 @@
 # Automatic setup and evidence-driven investigations
 
+Version 2.17 adds [guided instagrapi operator login and broader research](GUIDED_INSTAGRAM_LOGIN.md). The managed Osintgram backend can now use an encrypted operator session instead of HikerAPI. Both dated positive and negative checker controls are required to clear quarantine; the older single-control behavior below is superseded.
+
 Vidocq 2.16 includes a **Set up investigation tools** panel. Approve the tools you want once; Vidocq remembers those choices and starts their local services on subsequent launches. Setup never searches a subject. Each case still has its own source permissions, direct-request approval and finite budgets.
 
 | Tool | Automatic part | What you supply |
@@ -10,13 +12,13 @@ Vidocq 2.16 includes a **Set up investigation tools** panel. Approve the tools y
 | Photon | Start the included pinned crawler and enforce public HTTPS/robots/page/depth limits | Approve direct requests to a specific website |
 | Local AI | Download/verify the pinned runtime/model, preserve files on updates, start on demand | Approve the approximately 2.54 GB download and enable AI-assisted investigation in the case |
 | Browser helper | Register Vidocq's Windows URI handler; generate a capture bookmark for the selected case | Add/use the bookmark or install the optional extension; approve opening Vidocq when the browser asks |
-| Osintgram | Start the included pinned public-profile service, prompt for missing credentials, retain the encrypted key | **Your HikerAPI key**; provider quota/charges may apply to approved lookups |
+| Osintgram | Start the included pinned public-profile service, prompt for missing credentials, retain the encrypted key | Your guided operator session or optional HikerAPI key; provider quota/charges can apply |
 
 There is no automatic registration or purchase of provider accounts. Steam and HIBP still need their respective keys. Other theHarvester providers can require credentials and are not made free by this setup. Existing manually configured services remain supported. The automatic installer currently targets the portable Windows x64 release; source developers build the companion assets with Python 3.14 and `python scripts/build_collectors.py` before starting the Python 3.12 app.
 
 ## Osintgram credentials
 
-The current upstream service supports HikerAPI or a separately prepared Instagram session. The included managed path uses **HikerAPI**, avoiding an automated Instagram password login. On first launch, or when the enabled service lacks a usable saved key, Vidocq prompts for your provider key in a password field. You can skip, change it, or forget it later.
+The current upstream service supports HikerAPI or a separately prepared Instagram session. The HikerAPI option uses a provider key. Version 2.17 also offers guided operator login; see the linked guide above. On first launch, or when the enabled service lacks a usable saved key, Vidocq prompts for your provider key in a password field. You can skip, change it, or forget it later.
 
 The key is encrypted with Windows DPAPI for the current Windows user, stored in the dedicated app data folder, and passed to the owned companion through standard input. The app does not return the key through its APIs or add it to reports, workspace backups, command-line arguments or logs. It survives executable updates. Forget stops the service and removes the saved credential; Burn includes the named credential files. A Windows account migration may require entering the key again. No subject password, password reset, contact syncing, message or follow action is used.
 
@@ -41,7 +43,7 @@ Major-index search buttons open prepared queries in your ordinary browser. Selec
 
 ## Dated checker controls
 
-Use an independently confirmed public profile as a dated checker control. A mismatch quarantines that site checker; an unavailable retry does not clear an earlier mismatch. A passing dated control can re-enable it. Controls expire after thirty days and do not validate every account or imply ownership. Unsupported, blocked, absent and unavailable outcomes remain separate.
+Use an independently confirmed public profile as a dated checker control. A mismatch quarantines that site checker; an unavailable retry does not clear an earlier mismatch. In 2.17, passing dated positive and negative controls are both required to clear quarantine. Controls expire after thirty days and do not validate every account or imply ownership. Unsupported, blocked, absent and unavailable outcomes remain separate.
 
 ## Packaging and limits
 

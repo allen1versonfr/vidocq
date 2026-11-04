@@ -105,7 +105,9 @@ class HealthTests(unittest.TestCase):
             health.run(payload);restored=MagicMock();restored.quarantined_sites={};CheckerHealth(temp,restored)
             self.assertIn('GitHub',restored.quarantined_sites,'Unavailable retries must not clear a previous mismatch.')
             client.maigret.return_value={'results':[{'checks':[{'site':'GitHub','outcome':'candidate'}]}]}
-            self.assertEqual(health.run(payload)['state'],'passed');self.assertNotIn('GitHub',client.quarantined_sites)
+            self.assertEqual(health.run(payload)['state'],'partial-validation');self.assertIn('GitHub',client.quarantined_sites)
+            client.maigret.return_value={'results':[{'checks':[{'site':'GitHub','outcome':'absent'}]}]}
+            self.assertEqual(health.run({**payload,'username':'absentfixture','expected':'absent'})['state'],'passed');self.assertNotIn('GitHub',client.quarantined_sites)
             with self.assertRaises(ValueError):health.run({**payload,'public_verified':False})
 
 class ManagedTests(unittest.TestCase):

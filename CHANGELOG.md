@@ -1,3 +1,7 @@
+# 2.17.0
+
+Added guided instagrapi operator login with 2FA, encrypted session retention and explicit reconnect; optional encrypted Serper/SerpApi search connections; reviewed/direct public-profile metadata and platform-scoped ID/link graphs; bounded empty-result variations; guided new-report continuation; source-quoted AI comparisons/next evidence; paired dated checker controls with history/fingerprints. See docs/GUIDED_INSTAGRAM_LOGIN.md. Live account/provider authentication requires user-supplied credentials; private benchmarks are not shipped.
+
 # 2.16.0
 
 Added managed collector/startup setup, encrypted Osintgram provider credentials, native reviewed-browser relay, active bounded local-AI planning/search/link/synthesis, explicit-link follow-ups, dated checker quarantine and clearer incomplete-coverage reports. See docs/AUTOMATED_SETUP.md.

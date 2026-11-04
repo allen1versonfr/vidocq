@@ -23,7 +23,7 @@ class ManagedCollectors:
     def request(self,kind,path,payload=None,timeout=15):
         entry=self.entries.get(kind)
         if not entry:raise ValueError('Start the managed collector first.')
-        allowed={'harvester':('/api/about','/api/v1/sources'),'osintgram':('/api/about','/api/run','/api/cancel'),'photon':('/api/about','/api/crawl')}
+        allowed={'harvester':('/api/about','/api/v1/sources'),'osintgram':('/api/about','/api/run','/api/cancel','/api/auth/start','/api/auth/status','/api/auth/code','/api/auth/cancel','/api/auth/session'),'photon':('/api/about','/api/crawl')}
         if path not in allowed[kind]:raise ValueError('Unsupported managed endpoint.')
         headers={'Content-Type':'application/json',('X-API-Key' if kind=='harvester' else 'X-Vidocq-Key'):entry['key']}
         req=Request('http://127.0.0.1:'+str(entry['port'])+path,data=None if payload is None else json.dumps(payload).encode(),headers=headers)
@@ -47,7 +47,7 @@ class ManagedCollectors:
             if not isinstance(spec,dict):raise ValueError('This build has no bundled '+kind+' companion. Install the current Windows release.')
             executable=safe_path(self.bundle/(kind+'.exe'))
             if executable.stat().st_size!=spec.get('size') or digest(executable)!=spec.get('sha256'):raise ValueError('Bundled collector integrity check failed; reinstall Vidocq.')
-            if kind=='osintgram' and (not credentials or not credentials.get('hiker_key')):raise ValueError('Save your HikerAPI credentials in setup first.')
+            if kind=='osintgram' and (not credentials or not (credentials.get('hiker_key') or credentials.get('backend')=='instagrapi')):raise ValueError('Save your provider key or connect an operator session first.')
             data=safe_path(self.data/kind);data.mkdir(parents=True,exist_ok=True)
             with socket.socket() as listener:listener.bind(('127.0.0.1',0));port=listener.getsockname()[1]
             key=secrets.token_urlsafe(32);env={k:v for k,v in os.environ.items() if not k.startswith(('THEHARVESTER_','HIKER','INSTAGRAM_','VIDOCQ_COMPANION_'))}

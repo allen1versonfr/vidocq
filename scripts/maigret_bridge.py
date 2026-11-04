@@ -16,6 +16,8 @@ from pathlib import Path
 import re
 import sys
 import threading
+from datetime import datetime,timezone
+import hashlib
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from urllib.parse import urlparse
 
@@ -49,7 +51,7 @@ class Bridge:
             if self.metadata is None:
                 import maigret
                 _,available=site_selection(list(MAIGRET_SITES))
-                self.metadata={'available_sites':list(available.values()),'service':'vidocq-maigret-bridge','protocol':1,'maigret_version':importlib.metadata.version('maigret'),'sites':list(MAIGRET_SITES),'public_checks_only':True}
+                self.metadata={'available_sites':list(available.values()),'service':'vidocq-maigret-bridge','protocol':1,'maigret_version':importlib.metadata.version('maigret'),'sites':list(MAIGRET_SITES),'public_checks_only':True,'fresh_checks':True}
             return dict(self.metadata)
     def cancel(self,run_id):
         if not isinstance(run_id,str) or not re.fullmatch('[0-9a-f]{24}',run_id):raise ValueError('Invalid run ID.')
@@ -96,7 +98,11 @@ class Bridge:
                 error_type=str(getattr(getattr(status,'error',None),'type',''))
                 outcome='candidate' if state=='Claimed' else 'absent' if state=='Available' else 'invalid-handle' if state=='Illegal' else 'unsupported' if actual is None else 'timeout' if 'timeout' in error_type.lower() else 'blocked' if any(t in error_type.lower() for t in ('captcha','bot','access denied','blocked','login','rate')) else 'cancelled' if cancelled else 'timeout' if timed_out else 'error'
                 reason=CHECKER_HOLDS.get(requested) or {'candidate':'Account may exist; ownership unverified.','absent':'No account detected by this check; not proof of absence.','unsupported':'Selected site unavailable in the installed reviewed database.','cancelled':'Run cancelled before a reliable result.','timeout':'Check or run deadline exceeded.','blocked':'Provider access/challenge/rate restriction; no bypass attempted.','error':'Check did not produce a reliable result.','invalid-handle':'Handle is not accepted by this site.'}[outcome]
-                rows.append({'site':requested,'status':state,'url':url,'username':username,'outcome':outcome,'reason':reason})
+                checker=getattr(chosen.get(actual),'url','') if actual else ''
+                diagnostics={'checked_at':datetime.now(timezone.utc).isoformat(),'error_type':error_type[:100],'maigret_version':importlib.metadata.version('maigret'),'checker_sha256':hashlib.sha256(str(checker).encode()).hexdigest(),'fresh_check':True}
+                code=item.get('http_status') if isinstance(item,dict) else None
+                if type(code) is int and 100<=code<=599:diagnostics['http_status']=code
+                rows.append({'site':requested,'status':state,'url':url,'username':username,'outcome':outcome,'reason':reason,'diagnostics':diagnostics})
             return {'username':username,'results':rows,'cancelled':cancelled,'protocol':1}
         finally:
             if task and not task.done():task.cancel();loop.run_until_complete(asyncio.gather(task,return_exceptions=True))

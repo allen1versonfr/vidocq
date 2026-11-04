@@ -196,8 +196,11 @@ class CaseService:
         if self.connectors:self.connectors.cancel(key)
         if self.collectors:self.collectors.cancel(key)
         return {'cancel_requested':bool(flag),'message':'Cancellation requested. Current requests may finish; completed evidence will be retained.' if flag else 'This report is no longer running.'}
-    def start(self,key,consent=False):
+    def start(self,key,consent=False,continued_from=None):
         if consent is not True:raise ValueError('Confirm sending the listed identifiers to public-index providers before running the report.')
+        if continued_from:
+            previous=self.run(continued_from)
+            if previous['case_id']!=key or previous['status'] not in ('complete','cancelled'):raise ValueError('Continue only from a finished report belonging to this case.')
         with self.lock:
             if self.active:raise ValueError('Another case report is running. Wait for it to finish.')
             case=self.get(key)
@@ -223,6 +226,7 @@ class CaseService:
                 'social_profiles':[{'platform':platform,'handle':handle,'reference':profile_reference(platform,handle),'status':'User supplied; not visited or verified'} for platform in PLATFORMS for handle in case.get(platform,[])],
                 'coverage':[],'prepared_searches':[],'phone_metadata':[],'limitations':[CAUTION,'Social profile, phone, email and username ownership is not verified. No calls, messages, account checks, direct profile visits or live target scans are performed.','Reference URLs and notes are context only. Original URLs are never fetched. Search links are prepared but not automatically run.']}
             opts=investigation_options(case.get('investigation'))
+            if continued_from:run['continued_from']=continued_from
             if opts['enabled']:
                 if self.collectors:
                     snapshot=self.collectors.status()

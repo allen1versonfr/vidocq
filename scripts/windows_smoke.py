@@ -228,6 +228,7 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
                 assert self.path=='/v1/chat/completions' and 'tools' not in payload
                 context=json.loads(payload['messages'][1]['content'])
                 if 'queries' in context:result={'indexes':[0]}
+                elif 'next_steps' in context:result={'comparisons':[],'next_step_indexes':[0]}
                 else:
                     row=context['records'][0];result={'claims':[{'citation':row['id'],'quote':row['excerpt'][:40],'text':'The source contains this quoted public excerpt.'}]}
                     if '"leads"' in payload['messages'][0]['content']:result={'leads':[]}
@@ -263,6 +264,8 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
         print('Frozen browser/Photon imports, historical aliases, link reports and local model fixture passed.')
         from automation_smoke import check as check_automation
         check_automation(request,root,exe,env)
+        from guided_workflow_smoke import check as check_guided_workflow
+        check_guided_workflow(request,root)
         with request('/api/workspace/backup',{'password':'synthetic backup password'}) as response:bundle=json.load(response)
         assert bundle['encrypted']
         with request('/api/workspace/restore',dict(bundle,password='synthetic backup password')) as response:preview=json.load(response)
@@ -278,8 +281,9 @@ with tempfile.TemporaryDirectory(prefix='Vidocq-ci-') as temp:
     (ai_fixture/MODEL['filename']).write_bytes(b'synthetic model preservation fixture')
     (root/'data'/'local-ai.json').write_text('{"enabled":false,"backend":"cpu"}')
     from credential_vault import Vault
-    Vault(root/'data').save('synthetic-persistence-key-not-for-provider-calls')
-    ai_snapshots={p:hashlib.sha256(p.read_bytes()).hexdigest() for p in (ai_fixture/MODEL['filename'],root/'data'/'local-ai.json',root/'data/credentials.dpapi',root/'data/automations.json')}
+    vault=Vault(root/'data');vault.save('synthetic-persistence-key-not-for-provider-calls')
+    vault.save_instagram('operatorfixture',{'authorization_data':{'ds_user_id':'123456','sessionid':'synthetic-update-preservation-session'},'cookies':{'ds_user_id':'123456','sessionid':'synthetic-update-preservation-session'}})
+    ai_snapshots={p:hashlib.sha256(p.read_bytes()).hexdigest() for p in (ai_fixture/MODEL['filename'],root/'data'/'local-ai.json',root/'data/credentials.dpapi',root/'data/automations.json',root/'data/search-connection.json')}
     for scenario in ('success', 'rollback'):
         folder=root/scenario;folder.mkdir()
         target=folder/'Vidocq.exe';shutil.copyfile(exe,target)
