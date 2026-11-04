@@ -108,3 +108,13 @@ class EngineQualityTests(unittest.TestCase):
         lead=next(r for r in run['records'] if r['origin']=='derived-public-content')
         self.assertTrue(lead['lead_only']);self.assertEqual(lead['content_parent_citation'],original['id']);self.assertNotEqual(lead.get('analyst_status'),'Confirmed')
         self.assertNotIn('/video/',lead['reference']);self.assertFalse(lead['relevance']['can_expand'])
+    def test_completion_is_published_only_with_final_ledger_and_worker_release(self):
+        original=self.service._save_run;observed=[]
+        def save(data,final=False):
+            original(data,final=final)
+            if data['status']=='complete' and not final:
+                observed.append(self.service.run(data['id'])['status'])
+        with patch.object(self.service,'_save_run',side_effect=save):
+            run=self.run_case(self.make(investigation={'enabled':True,'allow_maigret':False}))
+        self.assertTrue(observed);self.assertEqual(set(observed),{'running'})
+        self.assertEqual(run['status'],'complete');self.assertIn('request_ledger',run);self.assertIsNone(self.service.active)

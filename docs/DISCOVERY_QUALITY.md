@@ -16,6 +16,7 @@ This update targets useful account discovery and source relevance. Software test
 10. AI phases report filtered citations/reasons, selected resource counts and duplicate-context counts. Report exports include query efficiency and platform search details.
 11. Search request sharing and caches use the same normalized effective query, with platform scope kept distinct.
 12. Brave can optionally retain the first 20 results instead of 10. The default stays 10; request caps remain in force. The requested depth, original ranks and cache separation survive diagnostics and saved settings.
+13. Reports remain in a finalizing state until the final request ledger is committed under the settings lock. A completed response can no longer race unfinished bookkeeping and reject the operator's next configuration action.
 
 ## Controls and limits
 

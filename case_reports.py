@@ -207,9 +207,14 @@ class CaseService:
         with self.database() as db:row=db.execute('SELECT data FROM case_runs WHERE id=?',(key,)).fetchone()
         if not row:raise ValueError('Report not found.')
         return json.loads(row[0])
-    def _save_run(self,data):
-        self.save_progress(data)
-        with self.database() as db:db.execute('UPDATE case_runs SET data=? WHERE id=?',(json.dumps(data),data['id']))
+    def _save_run(self,data,final=False):
+        # The worker may still be writing its ledger/cleanup state. Do not expose
+        # a terminal snapshot until the final commit under the configuration lock.
+        payload=data
+        if not final and self.active==data['id'] and data['status'] not in ('queued','running'):
+            payload=dict(data,status='running',message='Finalizing report…')
+        self.save_progress(payload)
+        with self.database() as db:db.execute('UPDATE case_runs SET data=? WHERE id=?',(json.dumps(payload),data['id']))
     def cancel(self,key):
         self.run(key)
         with self.lock:
@@ -327,7 +332,8 @@ class CaseService:
             run.update(status='failed',message='The report stopped unexpectedly. Completed records were preserved. Start a new run to retry.');self._save_run(run)
         finally:
             with self.lock:
-                self.active=None;self.cancel_flags.pop(run['id'],None)
+                try:self._save_run(run,final=True)
+                finally:self.active=None;self.cancel_flags.pop(run['id'],None)
 
 
 def report_markdown(run):
