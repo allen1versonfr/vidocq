@@ -1,3 +1,17 @@
+# Vidocq 2.16.0 - Managed tools and evidence-driven AI
+
+- Included pinned theHarvester, Photon and Osintgram companions, alongside Maigret. One setup panel enables free Mwmbl and remembers local-service startup choices; setup runs no target queries.
+- Osintgram startup credential prompt, encrypted Windows-user-bound HikerAPI key storage, change/forget controls and update preservation. No automated Instagram password login; paid provider access still requires your working key.
+- AI-assisted case planning now adds and attempts validated searches, proposes explicit cited profile links and writes source-quoted review drafts, all within case permissions/budgets. No unrestricted model tools or cloud fallback.
+- Reviewed browser evidence can flow through a native Windows relay from a generated case-specific bookmark or optional Chrome/Firefox extension. Browser permission remains required; pending captures enter cases only after review.
+- Follow explicit public links to different handles, preserving parent citations without promoting ownership. Linked Maigret checks stay on the approved linked platform.
+- Dated public checker controls with persistent mismatch quarantine, plus explicit incomplete-coverage reporting. Expanded exact-file cleanup for companion artifacts, settings and encrypted credentials.
+- Separate collector source/build archive and license notices included in release assets.
+
+[Setup, credentials, permissions and limits](docs/AUTOMATED_SETUP.md). Mwmbl remains a small index. Live paid Osintgram provider calls require your key; service startup alone does not validate quota or provider access. No private-person benchmark data is included.
+
+## Previous release
+
 # Vidocq 2.15.0 - One-click local AI setup
 
 - First-run/Updates entry points for optional managed Qwen3-4B-Instruct-2507 Q4_K_M and llama.cpp setup (about 2.54 GB, roughly 3 GB free disk space). No terminal/server configuration needed.

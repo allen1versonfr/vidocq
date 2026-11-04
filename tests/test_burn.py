@@ -45,6 +45,17 @@ class BurnTests(unittest.TestCase):
             with self.assertRaises(ValueError):safe_root(path)
         with patch('burn.sys.frozen',False,create=True):
             with self.assertRaises(ValueError):self.manager.preview(True)
+    @unittest.skipUnless(os.name=='nt','Windows helper')
+    def test_companion_artifacts_and_credentials_removed_unknown_files_preserved(self):
+        owned=[self.root/'credentials.dpapi',self.root/'automations.json',self.root/'browser-relay.json',self.root/'checker-health.json',self.root/'harvester/runs.sqlite',self.root/'harvester/run-artifacts/12345678-1234-1234-1234-123456789abc/evidence.json']
+        for path in owned:path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(b'synthetic local state')
+        unknown=self.root/'harvester/run-artifacts/12345678-1234-1234-1234-123456789abc/notes.txt';unknown.write_text('Preserve')
+        plan=self.manager.preview();paths={Path(f['path']).resolve() for f in plan['files']}
+        self.assertTrue(all(p.resolve() in paths for p in owned));self.assertNotIn(unknown.resolve(),paths)
+        folder=self.helper(preserve_plan=True)
+        try:self.assertFalse(any(p.exists() for p in owned));self.assertTrue(unknown.exists());self.assertFalse(folder.exists())
+        finally:
+            if folder.exists():shutil.rmtree(folder)
     def test_typed_confirmation_token_and_expiry_are_required(self):
         plan=self.manager.preview()
         for data in [{'token':plan['token'],'confirmation':'burn'},{'token':'wrong','confirmation':'BURN VIDOCQ'}]:

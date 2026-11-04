@@ -5,6 +5,11 @@ from pathlib import Path
 import sys
 import traceback
 
+if len(sys.argv)==3 and sys.argv[1]=='--browser-capture':
+    from browser_bridge import relay_to_running
+    capture_data=Path(os.environ.get('VIDOCQ_DATA') or os.environ.get('LOCALAPPDATA',Path.home()/'.local/share'))/'Vidocq' if not os.environ.get('VIDOCQ_DATA') else Path(os.environ['VIDOCQ_DATA'])
+    if relay_to_running(sys.argv[2],capture_data):raise SystemExit(0)
+
 if len(sys.argv)>1 and sys.argv[1]=='--maigret-companion':
     sys.argv.pop(1)
     from scripts.maigret_bridge import main

@@ -1,5 +1,7 @@
 # Using Vidocq
 
+**Version 2.16:** the Windows release includes managed theHarvester, Photon and Osintgram services, saved setup choices, a native reviewed-browser relay and an active bounded AI case pipeline. Start with [Automatic setup](AUTOMATED_SETUP.md); manual-service instructions below remain optional alternatives.
+
 [← Project overview](../README.md) · [Updates](UPDATES.md) · [Data and privacy](PRIVACY.md)
 
 ## Research

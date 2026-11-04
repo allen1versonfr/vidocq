@@ -1,6 +1,8 @@
 # Discovery workbench (2.14)
 
-Save/select a case, then use Discovery workbench above the report. These features work without a paid search key. Normal case runs never start the crawler or model.
+**Version 2.16:** the Windows release includes managed theHarvester, Photon and Osintgram services, saved setup choices, a native reviewed-browser relay and an active bounded AI case pipeline. Start with [Automatic setup](AUTOMATED_SETUP.md); manual-service instructions below remain optional alternatives.
+
+Save/select a case, then use Discovery workbench above the report. These features work without a paid search key. The crawler needs separate direct-request approval. The model participates when an AI-assisted case or manual draft is approved.
 
 ## Chrome and Firefox capture
 
@@ -12,7 +14,7 @@ In Vidocq choose Browser JSON, select the downloaded file, review the preview, c
 
 ## Photon integration
 
-[Photon](https://github.com/s0md3v/Photon) is GPLv3 upstream software. Vidocq does not bundle, download or execute Photon. Export JSON with your separately installed Photon (`-e json`), then choose Photon JSON, enter the actual approved crawl root and import the reviewed file. Supports URL entries in internal, external, intel, scripts, files and endpoints; ignores non-URL data and other datasets. At most 300 links and a 150 KB input; saved evidence must fit 99 KB. Empty imports are rejected.
+[Photon](https://github.com/s0md3v/Photon) is GPLv3 upstream software. The Windows release includes a pinned separately executed Photon companion with strict public HTTPS/robots/scope budgets. Choose included Photon or the native collector in the website collector selector. You can also export JSON from a separately installed Photon (`-e json`) and import it with the actual crawl root. Imports support URL entries in internal, external, intel, scripts, files and endpoints; other data is ignored. At most 300 links and a 150 KB input; saved evidence must fit 99 KB. Empty imports are rejected.
 
 Photon's aggregate datasets lack per-page link provenance. Reports label these `photon-aggregate-lead`, not proof that the root page published each link. Import time is recorded, not invented original collection time. Importing makes no network requests. These imported URLs are not automatically searched or crawled.
 
@@ -32,4 +34,4 @@ The bundled Maigret Instagram public checker is held unavailable because it is u
 
 Run your own [llama.cpp-compatible local server](https://github.com/ggml-org/llama.cpp/tree/master/tools/server) with a model you selected for your hardware/license, bound to 127.0.0.1. Set port/model in Search connection and enable for the session. Vidocq calls only `http://127.0.0.1:<port>/v1/chat/completions`; proxy environment variables and redirects are disabled. Alternatively use the [managed installer added in 2.15](LOCAL_AI_SETUP.md), which downloads the recommended model/runtime after approval and manages their lifecycle. No cloud fallback or model tools.
 
-Approve each draft. Query mode selects up to five entries from the deterministic case query list and rejects unknown indexes. It executes nothing. Cited excerpt mode sends up to 12 non-rejected report excerpts (1,500 characters each); accepts at most six 10–600-character verbatim quotes with existing citation IDs. Unknown citations or unsupported quotations reject the entire draft. Source content can itself be wrong; quotation validation does not validate its claims. Drafts are shown separately and never alter evidence, ownership decisions or immutable reports. Manual runtime settings and draft output are session-only; managed installation/preferences persist across app updates. Do not run a local runtime configured to forward to a cloud service. Real model quality/latency varies. CI uses deterministic fixtures; separate local validation exercises the real pinned model on synthetic content.
+The manual workbench differs from the active [AI case pipeline](AUTOMATED_SETUP.md#the-ai-now-participates-in-a-case). Approve each manual draft. Query mode selects up to five entries from the deterministic case query list and rejects unknown indexes; this manual mode executes nothing. Cited excerpt mode sends up to 12 non-rejected report excerpts (1,500 characters each) and accepts at most six 10–600-character verbatim quotes with existing citation IDs. Unknown citations or unsupported quotations reject the draft. Source content can itself be wrong; quotation validation does not validate its claims. Drafts never alter evidence or ownership decisions. Manual runtime settings and standalone drafts are session-only; managed preferences and case-report snapshots persist. Do not configure a local runtime to forward to a cloud service. Model quality/latency varies. CI uses deterministic fixtures; separate local validation exercises the real pinned model on synthetic content.

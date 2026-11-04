@@ -41,6 +41,8 @@ class AdditionalCollectors:
     def __init__(self):
         self.lock=threading.RLock();self.enabled={x:False for x in ('hibp','harvester','maigret')};self.keys={x:'' for x in self.enabled}
         self.ports={'harvester':5000,'maigret':8001};self.counts={x:0 for x in self.enabled};self.next_hibp=0;self.cache={};self.pending={};self.cancelled=set();self.manager=None;self.managed=False
+        self.harvester_manager=None
+        self.quarantined_sites={}
 
     def status(self):
         with self.lock:return {**{k:{'enabled':self.enabled[k],'configured':bool(self.keys[k]),'port':self.ports.get(k),'session_requests':self.counts[k],'session_limit':100 if k=='hibp' else 20} for k in self.enabled},
@@ -66,6 +68,8 @@ class AdditionalCollectors:
             if keys['hibp']!=self.keys['hibp']:self.cache.clear()
             self.keys=keys;self.enabled=enabled;self.ports=ports
         if 'maigret_key' in p:self.managed=False
+        if self.harvester_manager and (not enabled['harvester'] or p.get('harvester_key')):
+            self.harvester_manager.stop('harvester');self.harvester_manager=None
         if self.manager and (not enabled['maigret'] or not self.managed):self.manager.stop()
         return self.status()
 
@@ -123,6 +127,8 @@ class AdditionalCollectors:
 
     def harvester(self,domain,run_id,sources):
         from app import normalize
+        if self.harvester_manager and self.enabled['harvester']:
+            key,port=self.harvester_manager.ensure('harvester');self.keys['harvester']=key;self.ports['harvester']=port
         _,domain=normalize('domain',domain);sources=selected(sources,HARVESTER_SOURCES,4);key,port=self._access('harvester');base='http://127.0.0.1:'+str(port)
         catalog=transport(base+'/api/v1/sources',key=key,service='harvester')
         if not isinstance(catalog,dict) or not isinstance(catalog.get('sources'),list):raise ValueError('Local service is not a compatible HarvestView API.')
@@ -171,11 +177,15 @@ class AdditionalCollectors:
         finally:
             with self.lock:self.pending.pop(job,None)
 
-    def maigret(self,username,run_id,sites):
+    def maigret(self,username,run_id,sites,ignore_health=False):
         import secrets
         username=username.removeprefix('@') if isinstance(username,str) else ''
         if not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,63}',username):raise ValueError('Maigret requires a supplied handle, not an email, name or URL.')
         sites=selected(sites,MAIGRET_SITES,10)
+        held=[] if ignore_health else [s for s in sites if s in self.quarantined_sites]
+        held_checks=[{'site':s,'status':'Unknown','outcome':'unsupported','reason':'Checker disabled after a verified control mismatch; run a new public control before reuse.'} for s in held]
+        sites=[s for s in sites if s not in held]
+        if not sites:return {'results':[{'provider':'Maigret','status':'partial','rows':[],'checks':held_checks,'message':'Selected checker unavailable after control validation.'}],'links':[]}
         if self.manager and self.managed and self.enabled['maigret']:
             key,port=self.manager.ensure()
             with self.lock:self.keys['maigret']=key;self.ports['maigret']=port
@@ -206,6 +216,7 @@ class AdditionalCollectors:
                 if p.scheme not in ('https','http') or p.hostname not in MAIGRET_SITES[item['site']] or p.username or p.password:raise ValueError('Maigret returned an out-of-scope profile reference.')
                 rows.append({'title':'Maigret candidate · '+item['site']+' · '+username,'detail':json.dumps(item,ensure_ascii=False)+'\nPublic username check only. A matching handle is not proof of account ownership or common identity.','reference':url,'lead_only':True})
             for missing in set(sites)-seen:checks.append({'site':missing,'status':'Unknown','outcome':'unknown','reason':'Companion did not return this selected site.'})
+            if held_checks:checks+=held_checks;failed=True
             return {'results':[{'provider':'Maigret','status':'partial' if failed else 'ok' if rows else 'empty','source':base+'/api/search','rows':rows,'checks':checks,'message':'Some checks were blocked, unavailable or cancelled; missing results are not proof of absent accounts.' if failed else 'Selected-site username checks; all candidates require review.'}],'links':[]}
         except ValueError:
             self._cancel_backend('maigret',base,key,job);raise

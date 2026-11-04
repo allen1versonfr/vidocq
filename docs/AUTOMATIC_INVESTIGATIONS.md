@@ -1,5 +1,7 @@
 # Automatic investigations, Steam and Osintgram — 2.9.0
 
+**Version 2.16:** the Windows release includes managed theHarvester, Photon and Osintgram services, saved setup choices, a native reviewed-browser relay and an active bounded AI case pipeline. Start with [Automatic setup](AUTOMATED_SETUP.md); manual-service instructions below remain optional alternatives.
+
 ## From known clues to a report
 
 Open Cases & reports. Supply names, phones, emails, usernames, Instagram/TikTok/VSCO profiles, Steam accounts, domains or public IPs. You can also provide employer/location context, notes, reference URLs and selected notebook evidence. Save up to 15 explicit searchable identifiers. Enable Automatic investigation, choose limits, confirm the selected source activity, then select Investigate and generate report.
@@ -8,7 +10,7 @@ The engine searches each supplied identifier, extracts explicit new identifiers 
 
 Defaults are 25 identifier searches, up to 5 discovered identifiers, and one follow-up level. Limits can be set to 1–40 searches, 0–10 follow-ups, and 0–2 levels. Each identifier search can call several providers. These are work limits, not a dollar spending guarantee; review your provider account limits. Supplied inputs and supplementary/context searches consume the budget before new clues. The report explicitly lists inputs left unsearched.
 
-The engine is deterministic; it does not execute instructions found in snippets, generate a biography, invent contact details or assign identity-confidence percentages. Common-name-only hits do not automatically expand. A returned record must match a supplied strong identifier (phone/email or supplied account reference), contain multiple distinct supplied identifiers, or explicitly contain a supported previously discovered identifier. Explicit profile results from the opted-in connectors can also supply follow-ups. Identical handles across platforms count once for co-occurrence, not as independent corroboration. Ordinary reference-page hostnames are not automatically treated as subject domains; explicit URLs in returned text can supply domain clues. CBL claims do not trigger automatic follow-ups.
+The core engine is deterministic. Optional AI-assisted cases add validated query selections, explicit cited links and source-quoted review drafts; they do not grant snippets unrestricted instructions or invent contact details or identity-confidence percentages. Common-name-only hits do not automatically expand. Ordinary derived clues need a strong supplied identifier, multiple distinct supplied identifiers, or a supported prior clue. Explicit profile results and approved published profile links can also supply bounded follow-ups. Shared handles count once for co-occurrence, not as independent corroboration. Ordinary reference-page hosts are not automatically treated as subject domains. CBL claims do not trigger follow-ups.
 
 ## Read the generated report
 
@@ -42,9 +44,9 @@ The optional Community Ban List switch queries only `https://communitybanlist.co
 
 ## Osintgram connection
 
-[Datalux/Osintgram](https://github.com/Datalux/Osintgram) 2.x provides a local web API. Vidocq interoperates over that API rather than copying GPL-3.0 source into its executable. Keep Osintgram separately installed and consult its [setup guide](https://github.com/Datalux/Osintgram/blob/master/doc/web-ui.md) for requirements and backend terms.
+The Windows release includes a separately executed pinned [Datalux/Osintgram](https://github.com/Datalux/Osintgram) GPL-3.0 companion. Use Automatic setup and enter your HikerAPI key in Vidocq; it is saved with Windows encryption. Provider charges and access limits apply. No subject or Instagram password is requested. Corresponding source accompanies the release. An existing external Osintgram API remains an advanced alternative.
 
-One-time setup outside Vidocq:
+Optional external setup, not needed for the managed Windows path:
 
 ```powershell
 git clone https://github.com/Datalux/Osintgram.git
@@ -54,7 +56,7 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m uvicorn src.web.app:app --host 127.0.0.1 --port 8000
 ```
 
-Open Osintgram locally and configure your HikerAPI account/key or its supported Instagram backend there. Its credential storage, account/session behavior, access restrictions and any charges are controlled by Osintgram and its backend, not Vidocq. Do not expose the unauthenticated companion service beyond loopback. No Instagram password or HikerAPI key is requested or saved by Vidocq.
+For this external-service alternative, open Osintgram locally and configure its backend there. Credentials, account/session behavior, access restrictions and charges remain under that service's control. Do not expose it beyond loopback. Managed Vidocq setup instead encrypts and retains your HikerAPI key.
 
 In Vidocq's Search connection, enable the Osintgram bridge and set its local port (default 8000). The hostname is fixed to `127.0.0.1`; remote/custom URLs are not accepted. In the case allow connectors and choose supported commands:
 

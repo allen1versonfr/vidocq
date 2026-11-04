@@ -24,11 +24,15 @@
 
 Vidocq brings a focused set of research tools into one desktop app: public-record searches, image-source matches, a local evidence notebook, and verified GitHub updates. It keeps the source and context attached to each saved finding so you can distinguish a lead from a conclusion.
 
-The current Windows release is **2.15.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+The current Windows release is **2.16.0**. Its automated tests and Windows executable checks cover startup, replacement, restart, and failed-start rollback. See [validation](VALIDATION.md) and the [release history](CHANGELOG.md).
+
+## Automatic setup and active local AI
+
+Set up Mwmbl, Maigret, theHarvester, Photon and Osintgram inside Vidocq, with saved startup choices and Windows-encrypted Osintgram provider credentials. Register the browser evidence helper and optionally install the recommended local model. AI-assisted cases now execute validated query selections, follow eligible explicit profile links within approved budgets, and produce cited review drafts. Dated checker controls quarantine mismatches; reports clearly show incomplete coverage. [Setup, credentials and limits](docs/AUTOMATED_SETUP.md).
 
 ## Discovery workbench
 
-Import selected public browser evidence with the Chrome/Firefox helper, import Photon JSON, capture public links with a separately approved bounded crawler, and preserve dated historical aliases. Reports cite link observations separately from ownership decisions. Optional local llama.cpp-compatible drafting selects bounded queries and validated source quotations. Optional first-run/update setup downloads and verifies the recommended local model/runtime once, preserves them across app updates, and uses Vulkan with CPU fallback. No cloud fallback. [Local AI setup](docs/LOCAL_AI_SETUP.md). [Setup and limits](docs/DISCOVERY_WORKBENCH.md).
+Import selected public browser evidence with the Chrome/Firefox helper, import Photon JSON, capture public links with a separately approved bounded crawler, and preserve dated historical aliases. Reports cite link observations separately from ownership decisions. Local llama.cpp-compatible drafting selects bounded queries and validated source quotations; AI-assisted cases can execute validated proposals within case budgets. Optional first-run/update setup downloads and verifies the recommended local model/runtime once, preserves them across app updates, and uses Vulkan with CPU fallback. No cloud fallback. [Local AI setup](docs/LOCAL_AI_SETUP.md). [Setup and limits](docs/DISCOVERY_WORKBENCH.md).
 
 ## Reviewable investigations and local cleanup
 
@@ -40,11 +44,11 @@ In Search connection, click **Enable free web search** to use anonymous Mwmbl wi
 
 ## Automatic investigations with Steam and Osintgram
 
-Enter known identifiers and context, set search/depth limits, and generate a report with an evidence-linked summary, discovered clues, relevance groups and coverage gaps. Optional Steam API and local Osintgram 2.x connectors can enrich supplied or eligible discovered profiles when explicitly allowed. Free Mwmbl web search needs no account or key; optional Brave remains available. Steam needs your key, and Osintgram requires its separate configured local service. [Setup and investigation guide →](docs/AUTOMATIC_INVESTIGATIONS.md)
+Enter known identifiers and context, set search/depth limits, and generate a report with an evidence-linked summary, discovered clues, relevance groups and coverage gaps. Optional Steam API and local Osintgram 2.x connectors can enrich supplied or eligible discovered profiles when explicitly allowed. Free Mwmbl web search needs no account or key; optional Brave remains available. Steam needs your key, and managed Osintgram needs your HikerAPI key (or a separately configured external service). [Setup and investigation guide →](docs/AUTOMATIC_INVESTIGATIONS.md)
 
 ## Additional collectors
 
-Optional HIBP email breach metadata, passive theHarvester domain research and selected-site Maigret username checks now feed case reports. Each requires setup and a case permission. HIBP needs your subscription key; theHarvester needs a separate local service; Maigret is included and starts with the setup button. [Setup and limits](docs/ADDITIONAL_COLLECTORS.md).
+Optional HIBP email breach metadata, passive theHarvester domain research and selected-site Maigret username checks now feed case reports. Each requires setup and a case permission. HIBP needs your subscription key; theHarvester and Maigret are included and start with the setup panel. Passive no-key theHarvester sources are available; other providers can need their own credentials. [Setup and limits](docs/ADDITIONAL_COLLECTORS.md).
 
 ## SpiderFoot import
 
@@ -61,7 +65,7 @@ Structured evidence, editable/searchable notebooks, evidence-backed entity relat
 | **Cases & reports** | Investigate supplied identifiers/context, follow supported new clues within limits, separate stronger/uncertain leads, and export cited HTML, Markdown or JSON reports. |
 | **Social profiles** | Instagram/TikTok/VSCO index searches, Steam API enrichment, and an optional Osintgram 2.x public-profile bridge in explicitly enabled case runs. |
 | **Phone** | Normalize numbers and inspect offline numbering-plan metadata without calling, messaging or identifying an owner. |
-| **Research** | Look up domains, public IPs, and topics through reviewed third-party indexes. Retrieve indexed mentions with an optional Brave API connection. |
+| **Research** | Look up domains, public IPs and topics through reviewed indexes. Retrieve indexed mentions with free Mwmbl or optional Brave. |
 | **Image search** | Search SauceNAO for possible image-source matches, with similarity scores and source references. |
 | **Notebook** | Save returned records or your own observations, add context and an evidence status, and export findings as JSON. |
 | **Source catalog** | Browse 1,171 framework entries; filter the 1,040 with upstream free-access metadata, inspect integration limits, and search indexed pages. |
@@ -75,33 +79,33 @@ Structured evidence, editable/searchable notebooks, evidence-backed entity relat
 | Domain | Certificate Transparency records from crt.sh; Internet Archive snapshot metadata | Google, Bing, ICANN registration lookup, indexed pages |
 | Public IP | ARIN RDAP network-allocation records; provider redirects are restricted to the reviewed registry hosts | Google, Bing, RIPEstat |
 | Topic / organization | Wikipedia and Open Library catalog results | Google, Bing, DuckDuckGo, Wikipedia, Google Scholar, PubMed, Open Library, Google Patents |
-| Username | Optional Brave web-index snippets; no account-existence checks | Google, Bing, and Google queries scoped to GitHub, Reddit, Instagram, or TikTok |
-| Email | Optional Brave web-index snippets; no mailbox or account validation | Google and Bing |
-| Instagram / TikTok / VSCO | Optional Brave snippets; explicitly enabled cases can additionally use Osintgram for Instagram public data | Google, Bing, DuckDuckGo platform searches |
-| Person | Wikipedia, GDELT recent news, optional Brave web-index snippets | Google, Bing, DuckDuckGo |
-| Phone | Offline numbering metadata and optional Brave indexed mentions; no owner verification | Google, Bing, DuckDuckGo |
-| Steam | Brave index snippets; opt-in Valve profile/library/recent-game data and optional CBL provider records | Google, Bing, DuckDuckGo |
+| Username | Mwmbl/Brave index snippets; selected Maigret checks require case permission | Google, Bing, and Google queries scoped to GitHub, Reddit, Instagram, or TikTok |
+| Email | Mwmbl/Brave index snippets; optional HIBP metadata, no mailbox validation | Google and Bing |
+| Instagram / TikTok / VSCO | Mwmbl/Brave snippets; opted-in Osintgram for Instagram public data | Google, Bing, DuckDuckGo platform searches |
+| Person | Wikipedia, GDELT recent news, Mwmbl/Brave snippets | Google, Bing, DuckDuckGo |
+| Phone | Offline numbering metadata and Mwmbl/Brave mentions; no owner verification | Google, Bing, DuckDuckGo |
+| Steam | Mwmbl/Brave snippets; opt-in Valve profile/library/recent-game data and CBL records | Google, Bing, DuckDuckGo |
 | Image | SauceNAO visual matches after upload consent | Returned source addresses are displayed as references |
 
 Providers can return incomplete data, errors, or no results. A match is a lead to evaluate, not proof of identity or ownership.
 
 ## From a few identifiers to a sourced report
 
-Use **Cases & reports** to supply names, usernames, Instagram/TikTok/VSCO profiles, emails, phones, domains, public IPs, reference URLs, notes and selected notebook findings together. Vidocq searches supported indexes, tracks failures and gaps, deduplicates exact records and produces a report with source citations. Names use Wikipedia and GDELT’s recent news index; phone analysis is offline. An enabled **Search connection** retrieves Brave web-index snippets for names, usernames, Instagram/TikTok/VSCO profiles, emails and phone numbers; without it, email/username/phone web searches remain prepared links. The app cannot establish identity or promise everything on the internet.
+Use **Cases & reports** to supply identifiers, reference URLs, notes and selected notebook findings together. Vidocq searches supported indexes, records failures/gaps, deduplicates exact records and produces cited reports. Names use Wikipedia and GDELT; phone metadata is offline. An enabled Mwmbl or optional Brave connection retrieves indexed mentions for names, handles, emails and phones. Without web search those queries remain prepared links. The app cannot establish identity or promise everything on the internet.
 
 [Case workflow, phone limits and report exports →](docs/CASES.md)
 
 ## If you get zero results
 
-Open **Search connection** and run **Check public sources**. Source errors, no matches and missing search connections are shown separately. Auto detect recognizes multi-word names. Wikipedia and news indexes do not cover most people. For general indexed mentions, enter your own Brave Search API key and enable it, then rerun the research or create a new report snapshot. Keys stay in memory for the session; optional `VIDOCQ_BRAVE_API_KEY` configuration is managed by you. Index searches request snippets and never follow original result URLs. Direct Steam/Osintgram APIs are separate, explicitly enabled connectors.
+Open **Search connection** and run **Check public sources**. Source errors, empty results and missing connections are shown separately. Wikipedia and news indexes do not cover most people. For general mentions, enable free Mwmbl or provide your optional Brave key, then rerun research or create a new report snapshot. Brave keys stay in memory for the session; optional `VIDOCQ_BRAVE_API_KEY` configuration is managed by you. Index searches request snippets and do not follow original result URLs. Direct Steam/Osintgram APIs require separate permission.
 
-Brave is optional and is not unlimited free search. Its current plan provides $5 monthly credits, requires a payment card at signup, and charges for usage beyond credits. Review [current pricing and signup conditions](https://api-dashboard.search.brave.com/documentation/resources/help-feedback) before enabling. Vidocq limits requests to 100 per app session; this is not a billing guarantee. No Brave account or key is included.
+Brave is optional; account requirements, pricing and quotas are controlled by its provider. Review [pricing and signup conditions](https://api-dashboard.search.brave.com/documentation/resources/help-feedback) before enabling. Vidocq limits requests to 100 per app session; this is not a billing guarantee. No Brave account or key is included.
 
 ## Social profiles and Windows icon
 
 In **Research**, choose Instagram, TikTok or VSCO and enter a handle, or paste a full profile URL with Auto detect. In **Cases & reports**, each platform has a separate field. Up to five handles per platform count toward the existing fifteen-identifier total. VSCO profile links ending in `/gallery` are supported. Post/video/short links are rejected; supply the full profile address instead. The app keeps platform identity and canonical supplied references in report snapshots and all exports. Older cases continue to load.
 
-With Brave enabled, the app searches `site:instagram.com`, `site:tiktok.com` or `site:vsco.co` and returns index snippets and source references. Without a key, it offers prepared index queries and reports that no online search ran. Supplied profiles and returned mentions are unverified; the app does not infer that handles across platforms belong to one person. Default index mode does not resolve profiles or fetch their pages. Explicitly permitted Steam/Osintgram connectors can retrieve API data; see the automatic investigation guide. No remote thumbnails or media are loaded.
+With a web index enabled, the app searches `site:instagram.com`, `site:tiktok.com` or `site:vsco.co` and returns snippets and source references. With web search disabled, it offers prepared queries and reports that no online search ran. Free Mwmbl needs no key. Supplied profiles and returned mentions remain unverified; shared handles do not establish common identity. Index mode does not fetch profile pages. Explicitly permitted Steam/Osintgram connectors can retrieve API data. No remote thumbnails or media are loaded.
 
 The portable executable includes a new navy/gold Vidocq magnifier icon in Windows sizes from 16–256 pixels, with a stable taskbar app identity. A standalone `Vidocq.ico` is also attached to releases. The Windows gate verifies the exact generated icon frames inside the executable.
 

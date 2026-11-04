@@ -163,3 +163,17 @@ def query_plan(case):
     for item in case.get('aliases',[]):add([item['handle']],'historical alias; current ownership unverified')
     for value in case.get('urls',[]):add([value],'exact supplied reference URL')
     return plan
+
+def research_plan(case):
+    """Only combine supplied identifiers; no invented names or ownership."""
+    plan=query_plan(case);seen={tuple(x['terms']) for x in plan}
+    def add(terms,reason):
+        key=tuple(terms)
+        if key not in seen and len(plan)<60:seen.add(key);plan.append({'terms':terms,'reason':reason})
+    handles=list(dict.fromkeys(case.get('usernames',[])+case.get('instagram',[])+case.get('tiktok',[])))[:8]
+    for name in case.get('names',[]):
+        for handle in handles:add([name,handle],'name and supplied handle co-occurrence')
+    for spelling in case.get('spelling_variants',[]):add([spelling],'analyst-approved name spelling variant')
+    for handle in handles:
+        for place in case.get('locations',[]):add([handle,place],'handle and supplied location co-occurrence')
+    return plan
