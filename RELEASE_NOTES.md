@@ -1,3 +1,15 @@
+# Vidocq 2.20.1
+
+Supplied public profile URLs now contribute reusable usernames to cross-platform search planning. Opaque account IDs, navigation URLs and content URLs are excluded, and repeated handles are deduplicated.
+
+Reports recognize first-and-last-name matches when a supplied name includes a middle name, and accept analyst-approved spelling variants. Multiple spellings count as one name signal; name-only matches remain unverified and cannot alone enable clue expansion.
+
+When adaptive searches are enabled, unrelated index results now trigger the existing bounded query variations. Previously, nonempty unrelated results could prevent a useful fallback. Existing search, request and adaptive-query limits still apply.
+
+Validation: 359 Python tests pass locally with one platform-capability skip. A synthetic end-to-end case recovers a candidate missed by the previous implementation under identical clues and a four-search cap. This does not establish a live benchmark score improvement. No private test data is included. Windows packaging, update and rollback gates run before publication.
+
+Previous release:
+
 # Vidocq 2.20.0
 
 New interface-created cases select 20 Brave results, with an option to use the connection setting or 10. Existing cases retain their settings. Optional extra Brave excerpts preserve more indexed context without fetching original pages; per-case depth/snippet choices have separate caches and do not change saved connections. Search/request/deadline limits still apply.
