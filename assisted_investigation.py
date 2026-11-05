@@ -415,10 +415,14 @@ def _execute(service,run):
                         if scheduled:enqueue(clue['kind'],clue['value'],clue['depth'],entry['id'],'discovered');followups+=1
         empty_index=any(p.get('status')=='empty' for result in reports for p in result.get('results',[]) if any(name in p.get('provider','') for name in ('Mwmbl','Brave','Serper','SerpApi')))
         noisy_index=any(p.get('status')=='ok' and p.get('rows') and all(source_quality(r)['kind']=='discovery_page' for r in p['rows']) for result in reports for p in result.get('results',[]) if any(name in p.get('provider','') for name in ('Mwmbl','Brave','Serper','SerpApi')))
-        if opts['adaptive_queries'] and (empty_index or noisy_index) and task['depth']==0:
+        index_rows=[row for result in reports for provider in result.get('results',[])
+                    if provider.get('status')=='ok' and any(name in provider.get('provider','') for name in ('Mwmbl','Brave','Serper','SerpApi'))
+                    for row in provider.get('rows',[])]
+        unrelated_index=bool(index_rows) and not any(evidence_gate(row,case)['eligible'] for row in index_rows)
+        if opts['adaptive_queries'] and (empty_index or noisy_index or unrelated_index) and task['depth']==0:
             while query_variants and len(run['query_variations'])<opts['adaptive_searches'] and run['completed']+len(queue)+1<opts['max_searches']:
                 variant=query_variants.popleft()
-                if enqueue('context',variant['terms'],origin='empty-result-query-variation'):run['query_variations'].append(dict(variant,trigger=seed,trigger_reason='discovery-pages-only' if noisy_index else 'empty-index'))
+                if enqueue('context',variant['terms'],origin='empty-result-query-variation'):run['query_variations'].append(dict(variant,trigger=seed,trigger_reason='discovery-pages-only' if noisy_index else 'empty-index' if empty_index else 'no-matching-identifiers'))
         run['completed']+=1
         run['search_log'].append(dict(task,status='completed',seed=seed))
         if task['origin']=='local-ai-approved-query-plan':run['ai']['executed_queries']+=1
