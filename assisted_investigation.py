@@ -87,9 +87,17 @@ def relevance(case,record):
     blob=record.get('title','')+'\n'+record.get('detail','')+'\n'+record.get('reference','')
     matched=[];seen=set();strong=False;weak=[]
     for field,kind in KINDS.items():
-        for value in case.get(field,[]):
+        values=case.get(field,[])
+        if field=='names':values=list(dict.fromkeys(values+case.get('spelling_variants',[])))
+        name_matched=False
+        for value in values:
             canonical=value.lstrip('@').casefold()
             hit=token_match(canonical,blob)
+            if field=='names':
+                parts=value.split()
+                hit=hit or (len(parts)>2 and token_match(parts[0]+' '+parts[-1],blob))
+                # Several spellings of one name are one relevance signal.
+                if name_matched:continue
             if field=='phones':
                 digits=re.sub(r'\D','',value)
                 hit=any(re.sub(r'\D','',part)==digits for part in re.findall(r'\+?\d[\d ()\.-]{6,}\d',blob))
@@ -101,6 +109,7 @@ def relevance(case,record):
                 exact=same_reference(value,record.get('reference',''));hit=hit or exact;strong=strong or exact
             if hit and canonical not in seen:
                 seen.add(canonical);matched.append(field+': '+value)
+                if field=='names':name_matched=True
                 strong=strong or field in ('phones','emails','steam')
     for ref in case.get('urls',[]):
         if account_identity(ref) and same_reference(ref,record.get('reference','')):

@@ -75,3 +75,27 @@ class AssessmentTests(unittest.TestCase):
         self.run['records'][0]['detail']='Public username check only. A matching handle is not proof of account ownership or common identity.'
         result=self.generate({'claims':[{'citation':'R1','quote':'A matching handle is not proof of account ownership or common identity.','text':'Ownership is not established.'}]},'synthesis')
         self.assertEqual(result['claims'],[])
+
+
+class ProfileURLPlanningTests(unittest.TestCase):
+    def test_url_only_seed_has_cross_platform_handle_queries(self):
+        from research_workflow import platform_plan
+        plan=platform_plan({'urls':['https://www.instagram.com/fixture_handle/']})
+        self.assertTrue(plan)
+        self.assertTrue(all(q['terms']==['fixture_handle'] for q in plan))
+        self.assertIn('tiktok.com',[q['site'] for q in plan])
+        self.assertNotIn('instagram.com',[q['site'] for q in plan])
+
+    def test_content_navigation_and_opaque_ids_are_not_handle_seeds(self):
+        from research_workflow import platform_plan
+        for url in ['https://instagram.com/p/abcdef/', 'https://twitch.tv/directory',
+                    'https://open.spotify.com/user/abc123', 'https://hudl.com/profile/123',
+                    'https://linkedin.com/in/example-person-123']:
+            self.assertEqual(platform_plan({'urls':[url]}),[],url)
+
+    def test_url_and_explicit_handle_are_deduplicated(self):
+        from research_workflow import platform_plan
+        a={'usernames':['Fixture_Handle'],'urls':['https://instagram.com/fixture_handle/']}
+        plan=platform_plan(a)
+        self.assertEqual(len(plan),3)
+        self.assertTrue(all(q['terms']==['Fixture_Handle'] for q in plan))
