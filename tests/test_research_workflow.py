@@ -99,3 +99,38 @@ class ProfileURLPlanningTests(unittest.TestCase):
         plan=platform_plan(a)
         self.assertEqual(len(plan),3)
         self.assertTrue(all(q['terms']==['Fixture_Handle'] for q in plan))
+
+
+class UnrelatedSearchFallbackTests(unittest.TestCase):
+    setUp=engine_fixtures.EngineTests.setUp
+    tearDown=engine_fixtures.EngineTests.tearDown
+    make=engine_fixtures.EngineTests.make
+    run_case=engine_fixtures.EngineTests.run_case
+
+    def test_unrelated_results_trigger_bounded_variation_and_recover_candidate(self):
+        def search(terms):
+            self.contexts.append(terms)
+            matching=terms==['Example','Person']
+            return {'results':[{'provider':'Brave Search','status':'ok','rows':[{
+                'title':'Example Person' if matching else 'Unrelated Author',
+                'detail':'Public profile',
+                'reference':'https://github.com/recoveredfixture' if matching else 'https://github.com/unrelatedfixture'
+            }]}],'links':[]}
+        self.service.context_search=search
+        self.service.research=lambda k,v:search([v])
+        case=self.make(usernames=['fixtureseed'],investigation={'enabled':True,'allow_maigret':False,'adaptive_queries':True,'adaptive_searches':1,'max_searches':4})
+        run=self.run_case(case)
+        self.assertEqual(run['status'],'complete')
+        self.assertIn(['Example','Person'],self.contexts)
+        self.assertEqual(run['query_variations'][0]['trigger_reason'],'no-matching-identifiers')
+        self.assertLessEqual(run['completed'],4)
+        candidate=next(r for r in run['records'] if r['reference']=='https://github.com/recoveredfixture')
+        self.assertEqual(candidate['discovery_role'],'new-candidate')
+        self.assertFalse(candidate['relevance']['can_expand'])
+
+    def test_disabled_adaptation_does_not_add_queries(self):
+        self.service.research=lambda k,v:{'results':[{'provider':'Brave Search','status':'ok','rows':[{'title':'Unrelated','reference':'https://github.com/unrelatedfixture'}]}],'links':[]}
+        self.service.context_search=lambda terms:self.fail('Unexpected fallback query')
+        case=self.make(investigation={'enabled':True,'allow_maigret':False,'adaptive_queries':False,'max_searches':4})
+        run=self.run_case(case)
+        self.assertFalse(run['query_variations'])
