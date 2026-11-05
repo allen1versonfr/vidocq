@@ -11,6 +11,13 @@ EXTRAS=['pyinstaller==6.20.0','hikerapi==1.8.1','geopy==2.4.1','requests==2.32.5
 
 def run(command,**kwargs):subprocess.run([str(x) for x in command],check=True,cwd=ROOT,**kwargs)
 
+def prepare_build_paths(root):
+ paths={}
+ for kind in SOURCES:
+  paths[kind]={'work':root/'build/companion-work'/kind,'spec':root/'build/companion-specs'/kind}
+  for path in paths[kind].values():path.mkdir(parents=True,exist_ok=True)
+ return paths
+
 def freeze(command,kind,work):
  log=work/(kind+'-build.log')
  # Parallel --clean invocations must never clean one another's cache.
@@ -46,13 +53,14 @@ def main():
   if not (work/'osintgram-env/Scripts/python.exe').exists():run([sys.executable,'-m','uv','venv','--python',sys.executable,work/'osintgram-env'])
   run([sys.executable,'-m','uv','pip','sync','--python',work/'osintgram-env/Scripts/python.exe','--require-hashes',ROOT/'scripts/osintgram-lock.txt'])
  python=work/'harvester-env/Scripts/python.exe'
+ build_paths=prepare_build_paths(ROOT)
  def build(kind):
   options=[]
   if kind=='harvester':options=['--collect-all','theHarvester','--hidden-import','sqlalchemy.dialects.sqlite.aiosqlite','--collect-all','aiosqlite','--collect-all','greenlet']
   elif kind=='osintgram':options=['--paths',str(work/'osintgram-source'),'--collect-all','hikerapi','--collect-all','geopy','--collect-all','instagrapi','--collect-all','curl_cffi']
   else:options=['--paths',str(work/'photon-source'),'--collect-all','core','--collect-all','plugins','--collect-all','tld','--add-data',str(work/'photon-source')+';photon']
   build_python=work/'osintgram-env/Scripts/python.exe' if kind=='osintgram' else python
-  freeze([build_python,'-m','PyInstaller','--noconfirm','--clean','--onefile','--console','--name',kind,'--distpath',out,'--workpath',ROOT/'build/companion-work'/kind,'--specpath',ROOT/'build/companion-specs',*options,ROOT/'scripts'/(kind+'_companion.py')],kind,work)
+  freeze([build_python,'-m','PyInstaller','--noconfirm','--clean','--onefile','--console','--name',kind,'--distpath',out,'--workpath',build_paths[kind]['work'],'--specpath',build_paths[kind]['spec'],*options,ROOT/'scripts'/(kind+'_companion.py')],kind,work)
   exe=out/(kind+'.exe');return kind,{'sha256':hashlib.sha256(exe.read_bytes()).hexdigest(),'size':exe.stat().st_size,'commit':SOURCES[kind][1]}
  with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:manifest=dict(pool.map(build,SOURCES))
  (out/'manifest.json').write_text(json.dumps(manifest,indent=2),encoding='utf-8')

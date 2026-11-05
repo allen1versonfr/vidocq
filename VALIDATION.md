@@ -4,7 +4,7 @@ The 351-test suite passes locally with one Windows symlink-capability skip. New 
 
 A real local Qwen synthetic run returned valid outputs for planning, link abstention, source extraction and finite next actions. One selected quotation contained a supplied name beyond the former initial evidence slice; window offsets were recorded. This validates the contract, not investigative accuracy. Windows release gates exercise case depth/snippet metadata, cited-link retention and offline diagnosis against the actual executable, including unchanged sealed reports and existing restart/rollback/cleanup checks.
 
-No new paid/private-person investigation or fresh discovery score was measured. Private benchmark files are excluded from GitHub. Native visual/browser testing and live operator Instagram authentication remain outside this validation.
+The first CI release attempt stopped on a shared PyInstaller spec-directory creation race. Collector spec/work directories are now pre-created separately before parallel workers launch; the build-isolation regression covers that layout. No new paid/private-person investigation or fresh discovery score was measured. Private benchmark files are excluded from GitHub. Native visual/browser testing and live operator Instagram authentication remain outside this validation.
 
 Previous validation:
 
