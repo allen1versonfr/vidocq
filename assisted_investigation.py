@@ -325,7 +325,7 @@ def _execute(service,run):
                     variant=platform_variants.popleft()
                     if enqueue('context',variant['terms'],origin='platform-index-coverage',site=variant['site']):run['query_diagnostics']['platform_queries'].append(variant)
             if not queue:break
-        priority=lambda t:0 if t['origin'] in ('approved-published-link','local-ai-cited-public-link','indexed-snippet-link') else 2 if t['origin'] in ('supplied','supplied-context') else 1 if t['origin']=='discovered' else 3
+        priority=lambda t:0 if t['origin'] in ('approved-published-link','local-ai-cited-public-link','indexed-snippet-link') else 2 if t['origin'] in ('supplied','supplied-context') else 1 if t['origin'] in ('discovered','observed-handle-hypothesis') else 3
         task=min(queue,key=priority);queue.remove(task);kind,value=task['kind'],task['value'];seed=kind+': '+(' + '.join(value) if isinstance(value,list) else value)
         run.update(total=min(opts['max_searches'],run['completed']+len(queue)+1),message='Researching '+seed[:180])
         if hasattr(service,'save_progress'):service.save_progress(run)
@@ -373,6 +373,20 @@ def _execute(service,run):
                     entry=record(label,provider.get('source',''),row,task,origin)
                     if len(coverage_entry['returned_references'])<40:coverage_entry['returned_references'].append({'reference':entry['reference'],'citation':entry['id'],'rank':row.get('index_rank')})
                     if not entry['source_quality']['usable_for_ai']:continue
+                    # Explore an observed profile handle as a hypothesis, not a
+                    # verified alias. Results retain original case relevance rules.
+                    candidate=account_identity(entry['reference'])
+                    if (opts['follow_clues'] and opts['follow_indexed_links'] and task['depth']==0
+                            and opts['depth']>0 and candidate and not entry.get('lead_only')
+                            and entry.get('analyst_status')!='Rejected' and evidence_gate(entry,case)['eligible']
+                            and candidate['platform'] in ('instagram.com','tiktok.com','vsco.co','twitch.tv','x.com','github.com','last.fm','wattpad.com')):
+                        handle=candidate['handle']
+                        supplied={v.lstrip('@').casefold() for f in ('usernames','instagram','tiktok','vsco') for v in case.get(f,[])}
+                        supplied.update(i['handle'] for u in case.get('urls',[]) if (i:=account_identity(u)))
+                        if handle.casefold() not in supplied and followups<opts['max_followups'] and run['completed']+1<opts['max_searches'] and not cancelled.is_set():
+                            if enqueue('context',[handle],1,entry['id'],'observed-handle-hypothesis'):
+                                followups+=1
+                                run['discovered_clues'].append({'kind':'context','value':handle,'parent_citation':entry['id'],'depth':1,'status':'queued','reason':'Observed profile handle; identity unverified. Search results require independent review.'})
                     if opts['follow_indexed_links']:
                         for edge in indexed_profile_links(case,entry):
                             if edge not in run['link_evidence']:run['link_evidence'].append(edge)
@@ -427,6 +441,8 @@ def _execute(service,run):
         run['search_log'].append(dict(task,status='completed',seed=seed))
         if task['origin']=='local-ai-approved-query-plan':run['ai']['executed_queries']+=1
         run['records']=list(records.values());service._save_run(run)
+    attempted_platforms={query_key(t['value'],t.get('site')) for t in run['search_log'] if t.get('site') and t['status']=='completed'}
+    run['query_diagnostics']['unsearched_platform_queries']=[dict(q,reason_not_run='Not attempted within selected platform/search limits or run termination') for q in platform_plan(case) if query_key(q['terms'],q['site']) not in attempted_platforms]
     run['cancel_requested']=cancelled.is_set()
     run['termination_reason']='cancelled' if cancelled.is_set() else 'deadline' if time.monotonic()>=deadline else 'budget' if queue else 'completed'
     for task in queue:
@@ -434,7 +450,8 @@ def _execute(service,run):
     searched={(x['kind'],json.dumps(x['value'],sort_keys=True).casefold()) for x in run['search_log'] if x['status']=='completed'}
     for clue in run['discovered_clues']:
         if clue['status']=='queued':
-            clue['status']='attempted' if (clue['kind'],json.dumps(clue['value'],sort_keys=True).casefold()) in searched else 'not-searched'
+            clue_value=[clue['value']] if clue['kind']=='context' else clue['value']
+            clue['status']='attempted' if (clue['kind'],json.dumps(clue_value,sort_keys=True).casefold()) in searched else 'not-searched'
             if clue['status']=='attempted':clue['reason']='Follow-up processing finished; see source coverage for successful requests, failures or missing connections.'
     run['records']=list(records.values());run['analysis']=synthesis(run)
     run['profile_graph']=profile_graph(run['records'])

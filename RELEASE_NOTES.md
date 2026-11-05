@@ -1,3 +1,15 @@
+# Vidocq 2.21.0
+
+Platform search planning now pairs supplied handle and name queries on each platform, prioritizing Instagram and TikTok before VSCO and LinkedIn. A four-query platform limit therefore covers both term types on the first two platforms instead of one term type across four. Reports list the remaining unsearched platform queries. Existing budgets are preserved.
+
+With clue following and indexed-link following enabled, a relevant retrieved profile can supply a different observed handle for a bounded index-search hypothesis. Searches retain the parent citation, respect existing follow-up/depth/request limits, and never add the handle to confirmed case identifiers. Rejected profiles, generated link-only leads and opaque IDs cannot start this path. Hypothesis results remain subject to the original relevance rules and do not recursively expand.
+
+Validation: 363 Python tests pass locally with one platform-capability skip. Synthetic engine tests cover execution, deduplication, provenance, opt-out, zero budgets, rejected profiles and no automatic ownership promotion. Live discovery-score improvement remains unmeasured. Windows packaging, update and rollback checks must pass before publication. Private subject data is excluded.
+
+See docs/DISCOVERY_FOLLOWUPS.md for behavior and limits.
+
+Previous release:
+
 # Vidocq 2.20.1
 
 Supplied public profile URLs now contribute reusable usernames to cross-platform search planning. Opaque account IDs, navigation URLs and content URLs are excluded, and repeated handles are deduplicated.

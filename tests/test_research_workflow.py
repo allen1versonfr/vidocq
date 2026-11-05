@@ -134,3 +134,52 @@ class UnrelatedSearchFallbackTests(unittest.TestCase):
         case=self.make(investigation={'enabled':True,'allow_maigret':False,'adaptive_queries':False,'max_searches':4})
         run=self.run_case(case)
         self.assertFalse(run['query_variations'])
+
+
+class ObservedHandleFollowupTests(unittest.TestCase):
+    setUp=engine_fixtures.EngineTests.setUp
+    tearDown=engine_fixtures.EngineTests.tearDown
+    make=engine_fixtures.EngineTests.make
+    run_case=engine_fixtures.EngineTests.run_case
+
+    def configure_sources(self):
+        self.service.research=lambda k,v:{'results':[{'provider':'Brave Search','status':'ok','rows':[{'title':'Example Person','detail':'Public profile','reference':'https://instagram.com/observedfixture'}]}],'links':[]}
+        def context(terms):
+            self.contexts.append(terms)
+            return {'results':[{'provider':'Brave Search','status':'ok','rows':[{'title':'Different Display Name','detail':'Unverified account','reference':'https://www.tiktok.com/@observedfixture'}]}],'links':[]}
+        self.service.context_search=context
+
+    def test_observed_handle_runs_once_with_parent_without_ownership_promotion(self):
+        self.configure_sources()
+        case=self.make(usernames=['seedfixture'],investigation={'enabled':True,'allow_maigret':False,'follow_indexed_links':True,'max_followups':1,'max_searches':4})
+        run=self.run_case(case)
+        self.assertEqual(self.contexts,[['observedfixture']])
+        task=next(t for t in run['search_log'] if t['origin']=='observed-handle-hypothesis')
+        self.assertTrue(task['parent_citation'])
+        row=next(r for r in run['records'] if 'tiktok.com' in r['reference'])
+        self.assertIn(task['parent_citation'],row['parent_citations'])
+        self.assertFalse(row['relevance']['can_expand'])
+        self.assertEqual(row['discovery_role'],'unresolved')
+        self.assertEqual(run['analysis']['counts']['analyst_confirmed_accounts'],0)
+        self.assertEqual(run['discovered_clues'][0]['status'],'attempted')
+        self.assertLessEqual(run['completed'],4)
+
+    def test_opt_out_and_zero_budget_prevent_handle_search(self):
+        self.configure_sources()
+        for opts in [{'follow_indexed_links':False},{'follow_indexed_links':True,'max_followups':0},{'follow_indexed_links':True,'depth':0}]:
+            case=self.make(usernames=['seedfixture'],investigation={'enabled':True,'allow_maigret':False,**opts})
+            self.run_case(case)
+        self.assertFalse(self.contexts)
+
+    def test_rejected_profile_never_generates_handle_hypothesis(self):
+        self.configure_sources()
+        case=self.make(usernames=['seedfixture'],investigation={'enabled':True,'allow_maigret':False,'follow_indexed_links':True})
+        self.service.account_decision(case['id'],{'reference':'https://instagram.com/observedfixture','status':'Rejected','reason':'Synthetic negative control'})
+        self.run_case(case)
+        self.assertFalse(self.contexts)
+
+    def test_platform_cap_covers_both_seed_types_before_moving_on(self):
+        from research_workflow import platform_plan
+        plan=platform_plan({'names':['Example Person'],'usernames':['seedfixture']})[:4]
+        for site in ('instagram.com','tiktok.com'):
+            self.assertEqual([q['terms'] for q in plan if q['site']==site],[['seedfixture'],['Example','Person']])

@@ -27,8 +27,10 @@ def platform_plan(case):
     choices += [[h] for h in handles[1:2]]
     choices += [[n.split()[0],n.split()[-1]] if len(n.split())>1 else [n] for n in names[1:2]]
     result=[]
-    for offset in range(len(choices)):
-        for index,site in enumerate(sites):result.append({'terms':choices[(offset+index)%len(choices)],'site':site,'reason':'platform index coverage using supplied handle or name tokens'})
+    for site in sites:
+        for terms in choices:
+            if not any(q['site']==site and q['terms']==terms for q in result):
+                result.append({'terms':terms,'site':site,'reason':'paired handle and name coverage on each platform'})
     return result[:16]
 
 def variations(case):
