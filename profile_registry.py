@@ -86,3 +86,17 @@ def url_tokens(text):
 def same_reference(a,b):
     try:return canonical_reference(a)==canonical_reference(b)
     except ValueError:return False
+
+def supplied_profiles(case):
+    """Explicit supplied profile references, including dated alias assertions."""
+    from social_profiles import profile_reference
+    refs=list(case.get('urls',[]))+list(case.get('steam',[]))+url_tokens(case.get('notes',''))
+    for platform in ('instagram','tiktok','vsco'):
+        refs += [profile_reference(platform,h) for h in case.get(platform,[])]
+    for alias in case.get('aliases',[]):
+        refs += [alias.get('reference',''),alias.get('successor','')]
+        platform=alias.get('platform','').casefold()
+        if platform in ('instagram','tiktok','vsco'):
+            try:refs.append(profile_reference(platform,alias['handle']))
+            except ValueError:pass
+    return {identity['reference'] for value in refs if (identity:=account_identity(value))}

@@ -5,7 +5,7 @@ import re
 import time
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler
 from discovery_tools import query_plan,research_plan,public_url
-from evidence_quality import ranked_ai_records,evidence_gate
+from evidence_quality import ranked_ai_records,evidence_gate,evidence_excerpt
 from profile_registry import url_tokens
 from ai_evidence import selections,independent
 from run_control import timeout,RunStopped
@@ -52,7 +52,9 @@ class LocalDrafts:
         ranked=ranked_ai_records(raw_records,case)
         filtered=[{'citation':r.get('id'),'reason':evidence_gate(r,case)['reason']} for r in raw_records if not evidence_gate(r,case)['eligible']]
         if isinstance(run,dict):run['ai']['phases'][-1]['context_filter']={'input_records':len(raw_records),'eligible_records':len(ranked),'selected_records':min(12,len(ranked)),'deduplicated_records':len(raw_records)-len(filtered)-len(ranked),'omitted':filtered[:100]}
-        records=[{'id':r['id'],'title':r.get('title','')[:300],'excerpt':r.get('detail','')[:1500],'reference':r.get('reference','')} for r in ranked[:12]]
+        windows={r['id']:evidence_excerpt(r,case) for r in ranked[:12]}
+        if isinstance(run,dict):run['ai']['phases'][-1]['excerpt_windows']={k:{'start':v['start'],'end':v['end']} for k,v in windows.items()}
+        records=[{'id':r['id'],'title':r.get('title','')[:300],'excerpt':windows[r['id']]['text'],'reference':r.get('reference','')} for r in ranked[:12]]
         spans,links=selections(records)
         if mode in ('summary','leads','synthesis','assessment') and not records:
             return {'mode':mode,'draft':True,'claims':[],'leads':[],'comparisons':[],'next_steps':[],'notice':'No eligible cited evidence; no model call made.'}

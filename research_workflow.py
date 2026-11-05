@@ -37,10 +37,16 @@ def variations(case):
     return remaining[:12]
 
 def review_plan(case,run=None):
-    searched={tuple(x['value']) for x in (run or {}).get('search_log',[]) if x['kind']=='context' and x['status']=='completed'}
+    from search_queries import query_key
+    searched=set()
+    for task in (run or {}).get('search_log',[]):
+        if task.get('status')!='completed' or task.get('kind') not in ('person','username','context','reference','instagram','tiktok','vsco'):continue
+        value=task['value'];site=task.get('site') or {'instagram':'instagram.com','tiktok':'tiktok.com','vsco':'vsco.co'}.get(task['kind'])
+        searched.add(query_key(value if isinstance(value,list) else [value],site))
     queries=[];seen=set()
-    for q in variations(case)+query_plan(case):
-        key=tuple(q['terms'])
+    for q in variations(case)+query_plan(case)+platform_plan(case):
+        key=query_key(q['terms'],q.get('site'))
         if key in seen:continue
         seen.add(key);queries.append({**q,'previously_attempted':key in searched,'reviewed_capture_required':True})
-    return {'case_id':case['id'],'previous_run':(run or {}).get('id'),'queries':queries[:16],'next_steps':NEXT_STEPS,'source_gaps':(run or {}).get('coverage_assessment'),'notice':'Open the next search in your browser, review/capture public text or a profile bio, then create a new report with the added evidence. Continuing uses a new approved run budget; earlier reports remain unchanged.'}
+    queries.sort(key=lambda q:(q['previously_attempted'],not bool(q.get('site'))))
+    return {'case_id':case['id'],'previous_run':(run or {}).get('id'),'queries':queries[:24],'index_options':(run or {}).get('index_options',{}),'next_steps':NEXT_STEPS,'source_gaps':(run or {}).get('coverage_assessment'),'notice':'Open the next search in your browser, review/capture public text or a profile bio, then create a new report with the added evidence. Continuing uses a new approved run budget; earlier reports remain unchanged.'}

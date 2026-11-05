@@ -4,6 +4,7 @@ from html.parser import HTMLParser
 from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 from discovery_tools import public_url,fetch_public,Links,now
+from profile_registry import url_tokens,same_reference
 
 def profile_reference(value):
     ref=public_url(value);parsed=urlparse(ref)
@@ -18,7 +19,7 @@ def reviewed_profile(p):
     if any(not isinstance(x,str) for x in (stable,handle)) or not re.fullmatch(r'[A-Za-z0-9_.:-]{0,128}',stable) or not re.fullmatch(r'[A-Za-z0-9_.-]{0,64}',handle):raise ValueError('Invalid supplied public handle/stable ID.')
     urls=p.get('links',[])
     if not isinstance(urls,list) or len(urls)>50:raise ValueError('Use up to 50 explicit public links.')
-    urls=urls+re.findall(r'https://[^\s<>"\x27]+',bio);stamp=now();digest=hashlib.sha256(bio.encode()).hexdigest();edges=[];seen={ref}
+    urls=urls+url_tokens(bio);stamp=now();digest=hashlib.sha256(bio.encode()).hexdigest();edges=[];seen={ref}
     for url in urls:
         try:url=public_url(url)
         except (ValueError,TypeError):continue
@@ -27,15 +28,33 @@ def reviewed_profile(p):
     return {'schema':'vidocq-links-v1','origin':'reviewed-public-profile','reference':ref,'title':'Reviewed public profile'+(' · '+name if name else ''),'excerpt':bio,'profile':{'platform':parsed.hostname.removeprefix('www.'),'handle':handle,'display_name':name,'stable_id':stable,'biography':bio,'links':[e['target'] for e in edges[:50]],'observed_at':stamp},'edges':edges[:50],'notice':'Analyst-reviewed public observations. Stable IDs apply only within the named platform; ownership remains unverified.'}
 
 class Metadata(HTMLParser):
-    def __init__(self):super().__init__();self.bio='';self.title='';self.in_title=False
+    def __init__(self,reference=''):super().__init__();self.bio='';self.title='';self.in_title=False;self.reference=reference;self.json_text=None;self.structured_links=[]
     def handle_starttag(self,tag,attrs):
         a=dict(attrs)
         if tag=='title':self.in_title=True
+        if tag=='script' and a.get('type','').lower()=='application/ld+json':self.json_text=''
         if tag=='meta' and (a.get('property') or a.get('name')) in ('description','og:description') and not self.bio:self.bio=a.get('content','')[:6000]
     def handle_endtag(self,tag):
         if tag=='title':self.in_title=False
+        if tag=='script' and self.json_text is not None:
+            try:
+                data=json.loads(self.json_text);queue=[data];examined=0
+                while queue and examined<100:
+                    node=queue.pop(0);examined+=1
+                    if isinstance(node,list):queue.extend(node[:30]);continue
+                    if not isinstance(node,dict):continue
+                    graph=node.get('@graph',[])
+                    if isinstance(graph,list):queue.extend(graph[:30])
+                    types=node.get('@type',[]);types=[types] if isinstance(types,str) else types
+                    if not isinstance(types,list) or 'Person' not in types or not any(isinstance(node.get(k),str) and same_reference(node[k],self.reference) for k in ('url','@id')):continue
+                    if not self.bio and isinstance(node.get('description'),str):self.bio=node['description'][:6000]
+                    links=node.get('sameAs',[]);links=[links] if isinstance(links,str) else links
+                    if isinstance(links,list):self.structured_links.extend(u for u in links[:20] if isinstance(u,str) and len(u)<=2000)
+            except (ValueError,RecursionError):pass
+            self.json_text=None
     def handle_data(self,value):
         if self.in_title:self.title=(self.title+value)[:200]
+        if self.json_text is not None:self.json_text=(self.json_text+value)[:40000]
 
 def capture_profile(p,fetch=fetch_public):
     if p.get('consent') is not True:raise ValueError('Approve this direct public profile request. Visits may be logged.')
@@ -48,13 +67,16 @@ def capture_profile(p,fetch=fetch_public):
     if delay:
         import time
         time.sleep(delay)
-    body=fetch(ref);metadata=Metadata();metadata.feed(body)
+    body=fetch(ref);metadata=Metadata(ref);metadata.feed(body)
     if not metadata.bio or re.search(r'(?i)(log\s?in|sign\s?in|challenge|captcha)',metadata.title):raise ValueError('No reliable public profile metadata captured. Review it in your browser; no bypass was attempted.')
     parser=Links(ref);parser.feed(body)
-    capture=reviewed_profile({'consent':True,'public_reviewed':True,'reference':ref,'biography':metadata.bio,'display_name':metadata.title,'links':list(parser.links)[:50]})
+    bio_links=url_tokens(metadata.bio);preferred=metadata.structured_links+bio_links
+    capture=reviewed_profile({'consent':True,'public_reviewed':True,'reference':ref,'biography':metadata.bio,'display_name':metadata.title,'links':list(dict.fromkeys(preferred+parser.links))[:50]})
     capture['origin']='direct-public-profile';capture['source_sha256']=hashlib.sha256(body.encode()).hexdigest()
     capture['profile']['links']=[]
-    for edge in capture['edges']:edge['relation']='published-link';edge['source_sha256']=capture['source_sha256']
+    for edge in capture['edges']:
+        edge['relation']='published-link';edge['source_sha256']=capture['source_sha256'];edge['link_origin']='structured-person-sameAs' if edge['target'] in metadata.structured_links else 'public-bio-url' if edge['target'] in bio_links else 'page-anchor'
+    capture['profile']['links']=[e['target'] for e in capture['edges'] if e['link_origin']!='page-anchor']
     capture['notice']='One approved public page, parsed metadata and links; no login, redirects or challenge bypass. Account ownership remains unverified.'
     return capture
 
@@ -73,7 +95,7 @@ def profile_graph(records):
         if stable:ids.setdefault((host,stable),[]).append((ref,record['id']))
         bio=str(profile.get('biography',''))[:6000]
         links=profile.get('links',[]);links=links[:50] if isinstance(links,list) else []
-        for raw in re.findall(r'https://[^\s<>"\x27]+',bio)+links:
+        for raw in url_tokens(bio)+links:
             try:target=public_url(raw)
             except (ValueError,TypeError):continue
             if target!=ref:edges.append({'source':ref,'target':target,'relation':'public-bio-link','citations':[record['id']],'ownership_verified':False})

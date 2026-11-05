@@ -59,13 +59,15 @@ def options(value):
     if value is None:value={}
     if not isinstance(value,dict):raise ValueError('Invalid investigation settings.')
     result={}
-    for field,default in [('enabled',False),('follow_clues',True),('direct_sources',False),('allow_hibp',False),('allow_harvester',False),('allow_maigret',False),('ai_assisted',False),('follow_published_links',False),('adaptive_queries',False),('ai_assessment',True)]:
+    for field,default in [('enabled',False),('follow_clues',True),('direct_sources',False),('allow_hibp',False),('allow_harvester',False),('allow_maigret',False),('ai_assisted',False),('follow_published_links',False),('follow_indexed_links',False),('extra_snippets',False),('adaptive_queries',False),('ai_assessment',True)]:
         result[field]=value.get(field,default)
         if type(result[field]) is not bool:raise ValueError('Invalid investigation setting: '+field)
     for field,default,low,high in [('max_searches',25,1,40),('max_followups',5,0,10),('depth',1,0,2),('ai_searches',4,0,8),('adaptive_searches',3,0,6),('platform_searches',4,0,8),('deadline_seconds',600,10,1800),('provider_requests',40,1,100)]:
         number=value.get(field,default)
         if type(number) is not int or not low<=number<=high:raise ValueError('Investigation '+field+' is outside its allowed range.')
         result[field]=number
+    result['index_depth']=value.get('index_depth',0)
+    if type(result['index_depth']) is not int or result['index_depth'] not in (0,10,20):raise ValueError('Choose connection default, 10 or 20 results for this case.')
     result['osintgram_commands']=value.get('osintgram_commands',['get_user_info'])
     if not isinstance(result['osintgram_commands'],list) or not result['osintgram_commands'] or len(result['osintgram_commands'])>4 or any(c not in COMMANDS for c in result['osintgram_commands']):raise ValueError('Choose supported Osintgram commands.')
     result['osintgram_commands']=list(dict.fromkeys(['get_user_info']+result['osintgram_commands']))
@@ -161,15 +163,15 @@ def synthesis(run):
     counts={'raw_records':len(records),'candidate_records':len(grouped['stronger_leads'])+len(grouped['needs_review']),'unlinked_records':len(grouped['unlinked_results']),'rejected_records':len(grouped['rejected_evidence']),'analyst_confirmed_accounts':len(confirmed)}
     from discovery_review import canonical_reference
     counts['candidate_accounts']=len({canonical_reference(r['reference']) for r in records if source_quality(r)['account_candidate'] and r.get('analyst_status')!='Rejected' and (r.get('relevance',{}).get('matched_identifiers') or r.get('relevance',{}).get('weak_signals'))})
-    seeds={canonical_reference(ref) for ref in run['case'].get('urls',[]) if account_identity(ref)}
-    seeds.update(canonical_reference(profile_reference(platform,handle)) for platform in ('instagram','tiktok','vsco') for handle in run['case'].get(platform,[]))
-    seeds.update(canonical_reference(ref) for ref in run['case'].get('steam',[]) if account_identity(ref))
+    from profile_registry import supplied_profiles
+    seeds=supplied_profiles(run['case'])
     known={d['reference'] for d in run['case'].get('account_decisions',[]) if d.get('status')=='Confirmed'}
     for r in records:
         identity=account_identity(r.get('reference',''));ref=identity['reference'] if identity else None
         r['discovery_role']='seed' if ref in seeds else 'rediscovery' if ref in known else 'new-candidate' if ref and r.get('analyst_status')!='Rejected' and (r.get('relevance',{}).get('matched_identifiers') or r.get('relevance',{}).get('weak_signals')) else 'rejected' if r.get('analyst_status')=='Rejected' else 'unresolved'
     for role in ('seed','rediscovery','new-candidate'):
         counts[role.replace('-','_')+'_accounts']=len({account_identity(r['reference'])['reference'] for r in records if r['discovery_role']==role})
+    counts['explicit_linked_profile_leads']=len({r['reference'] for r in records if r.get('origin')=='explicit-linked-profile' and r.get('analyst_status')!='Rejected'})
     headline=('Evidence records containing multiple supplied identifiers: '+str(stronger)+'. Review their citations before attributing them to the same person.' if stronger else 'No record linked multiple supplied identifiers. Returned leads remain unverified; no identity conclusion was made.')
     headline='Raw records: '+str(counts['raw_records'])+'; relevant candidate records: '+str(counts['candidate_records'])+'; distinct candidate profile URLs: '+str(counts['candidate_accounts'])+'; analyst-confirmed accounts: '+str(len(confirmed))+'. '+headline
     if run.get('cancel_requested'):headline='Investigation cancelled. This report contains partial results only. '+headline
@@ -180,7 +182,7 @@ def synthesis(run):
 
 def execute(service,run):
     from run_control import CURRENT,RunControl
-    opts=options(run['case'].get('investigation'));control=RunControl(opts['deadline_seconds'],service.cancel_flags[run['id']],opts['provider_requests']);token=CURRENT.set(control)
+    opts=options(run['case'].get('investigation'));control=RunControl(opts['deadline_seconds'],service.cancel_flags[run['id']],opts['provider_requests'],opts['index_depth'],opts['extra_snippets']);token=CURRENT.set(control)
     try:return _execute(service,run)
     finally:
         run['request_ledger']=control.status();CURRENT.reset(token)
@@ -219,6 +221,7 @@ def _execute(service,run):
         if variant['reason'] not in ('supplied full name','supplied username','supplied location variant','supplied employer context'):
             enqueue('context',variant['terms'],origin=variant['reason'])
     run['query_plan']=query_plan(case);run['link_evidence']=[]
+    run['index_options']={'brave_depth':opts['index_depth'],'extra_snippets':opts['extra_snippets'],'follow_indexed_links':opts['follow_indexed_links'],'notice':'A zero depth uses the connection setting; other providers retain their own limits.'}
     run['ai']={'enabled':opts['ai_assisted'],'planned_queries':[],'executed_queries':0,'errors':[],'summary':None,'proposed_links':[],'assessment':None}
     if opts['ai_assisted']:
         try:
@@ -268,9 +271,23 @@ def _execute(service,run):
                     if edge['relation'] not in ('published-link','browser-captured-link','photon-aggregate-lead') or not safe_reference(edge['source']) or not safe_reference(edge['target']):continue
                     run['link_evidence'].append(dict(edge,citation=entry['id'],source_analyst_status=entry.get('analyst_status','Unverified'),target_rejected_by_analyst=rejected(case,edge.get('target','')),ownership_verified=False))
             except (ValueError,TypeError):pass
+    from profile_leads import historical_edges,indexed_profile_links
+    for edge in historical_edges(case.get('aliases',[])):
+        entry=record('Supplied historical assertion',edge['evidence_reference'],{'title':'Supplied historical alias and successor','detail':json.dumps(edge,ensure_ascii=False),'reference':edge['source'],'lead_only':True},{'kind':'history','value':edge['source'],'depth':0},'user-supplied')
+        entry['assertion_only']=True;entry['ai_eligibility']=evidence_gate(entry,case)
+        run['link_evidence'].append(dict(edge,citation=entry['id']))
     def published_link(url,parent,origin,depth=1):
         nonlocal followups
-        if not opts['follow_published_links'] or not opts['follow_clues'] or depth>opts['depth'] or rejected(case,url):return
+        enabled=opts['follow_indexed_links'] if origin=='indexed-snippet-link' else opts['follow_published_links']
+        if not enabled or not opts['follow_clues'] or depth>opts['depth'] or rejected(case,url):return
+        target=account_identity(url)
+        if not target:return
+        source=next((r for r in records.values() if r['id']==parent),None)
+        if not source or source.get('analyst_status')=='Rejected' or same_reference(source['reference'],target['reference']):return
+        if len([r for r in records.values() if r.get('origin')=='explicit-linked-profile'])<30:
+            if source and source.get('analyst_status')!='Rejected':
+                lead=record('Cited public account link',source['reference'],{'title':'Explicit account URL from cited evidence','detail':'Account URL explicitly present in cited evidence. This is a review lead, not a verified live account or ownership claim.','reference':target['reference'],'lead_only':True},{'kind':'linked-profile','value':target['reference'],'depth':depth,'parent_citation':parent},'explicit-linked-profile')
+                lead['link_relation']=origin;lead['linked_source_citation']=parent
         for clue in extract_clues(url,service.normalize):
             # Explicit public profile links only; do not widen to an entire shared platform.
             if clue['kind'] not in ('username','instagram','tiktok','vsco','steam','reference'):continue
@@ -299,7 +316,7 @@ def _execute(service,run):
                     variant=platform_variants.popleft()
                     if enqueue('context',variant['terms'],origin='platform-index-coverage',site=variant['site']):run['query_diagnostics']['platform_queries'].append(variant)
             if not queue:break
-        priority=lambda t:0 if t['origin'] in ('approved-published-link','local-ai-cited-public-link') else 2 if t['origin'] in ('supplied','supplied-context') else 1 if t['origin']=='discovered' else 3
+        priority=lambda t:0 if t['origin'] in ('approved-published-link','local-ai-cited-public-link','indexed-snippet-link') else 2 if t['origin'] in ('supplied','supplied-context') else 1 if t['origin']=='discovered' else 3
         task=min(queue,key=priority);queue.remove(task);kind,value=task['kind'],task['value'];seed=kind+': '+(' + '.join(value) if isinstance(value,list) else value)
         run.update(total=min(opts['max_searches'],run['completed']+len(queue)+1),message='Researching '+seed[:180])
         if hasattr(service,'save_progress'):service.save_progress(run)
@@ -318,7 +335,7 @@ def _execute(service,run):
         jobs=[]
         if opts['allow_hibp'] and kind=='email' and value.casefold() in {e.casefold() for e in case.get('emails',[])}:jobs.append(('Have I Been Pwned',lambda:service.collectors.hibp(value),'hibp:'+value.casefold()))
         if opts['allow_harvester'] and kind=='domain' and any(value==d or value.endswith('.'+d) for d in case.get('domains',[])):jobs.append(('theHarvester',lambda:service.collectors.harvester(value,run['id'],opts['harvester_sources']),'harvester:'+value))
-        linked=task['origin'] in ('approved-published-link','local-ai-cited-public-link')
+        linked=task['origin'] in ('approved-published-link','local-ai-cited-public-link','indexed-snippet-link')
         if opts['allow_maigret'] and kind in ('username','instagram','tiktok','vsco') and (task['depth']==0 or linked):
             excluded=rejected_sites(case,value,opts['maigret_sites']);sites=[site for site in opts['maigret_sites'] if site not in excluded]
             if linked:sites=[site for site in sites if site==task.get('site_scope')]
@@ -341,10 +358,16 @@ def _execute(service,run):
                     run['attributions']=[HIBP_ATTRIBUTION]
                 run['coverage'].append({'seed':seed,'provider':label,'status':provider.get('status','error'),'count':len(rows),'source':provider.get('source',''),'message':provider.get('message',''),'checks':provider.get('checks',[])})
                 if isinstance(provider.get('retrieval_diagnostics'),dict):run['coverage'][-1]['retrieval_diagnostics']=provider['retrieval_diagnostics']
+                coverage_entry=run['coverage'][-1];coverage_entry['returned_references']=[]
                 for row in rows:
                     origin='offline-metadata' if label=='Offline phone metadata' else 'retrieved'
                     entry=record(label,provider.get('source',''),row,task,origin)
+                    if len(coverage_entry['returned_references'])<40:coverage_entry['returned_references'].append({'reference':entry['reference'],'citation':entry['id'],'rank':row.get('index_rank')})
                     if not entry['source_quality']['usable_for_ai']:continue
+                    if opts['follow_indexed_links']:
+                        for edge in indexed_profile_links(case,entry):
+                            if edge not in run['link_evidence']:run['link_evidence'].append(edge)
+                            published_link(edge['target'],entry['id'],'indexed-snippet-link',task['depth']+1)
                     author=content_account_reference(entry['reference'])
                     if author and evidence_gate(entry,case)['eligible'] and not rejected(case,author['reference']):
                         lead=record('Indexed content author',entry['reference'],{'title':'Author profile from indexed content','detail':'Profile address is explicitly present in the indexed content path. Ownership is unverified.','reference':author['reference'],'lead_only':True},dict(task,parent_citation=entry['id']),'derived-public-content')
@@ -374,6 +397,8 @@ def _execute(service,run):
                         identity=(clue['kind'],json.dumps(clue['value'],sort_keys=True).casefold(),None)
                         if identity in seen:continue
                         permitted=not entry.get('lead_only') and (entry['relevance']['can_expand'] or (opts['direct_sources'] and label.startswith(('Steam public profile','Osintgram / get_user_info'))))
+                        indexed_profile=entry['source_quality']['account_candidate'] and (entry.get('observations',{}).get('index_only') or any(n in label for n in ('Brave','Mwmbl','Serper','SerpApi')))
+                        if indexed_profile and clue['kind'] in ('username','instagram','tiktok','vsco','steam','reference') and not opts['follow_indexed_links']:permitted=False
                         scheduled=permitted and followups<opts['max_followups'] and run['completed']+1<opts['max_searches'] and not cancelled.is_set()
                         reason='Queued within limits' if scheduled else 'Cancelled before follow-up' if cancelled.is_set() else 'Uncertain relevance — manual review required' if not permitted else 'Follow-up budget reached'
                         clue=dict(clue,parent_citation=entry['id'],depth=task['depth']+1,status='queued' if scheduled else 'not-searched',reason=reason)

@@ -1,2 +1,2 @@
-VERSION = '2.19.0'
+VERSION = '2.20.0'
 REPOSITORY = 'allen1versonfr/vidocq'

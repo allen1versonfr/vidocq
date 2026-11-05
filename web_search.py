@@ -6,7 +6,7 @@ from urllib.parse import urlencode,urlparse
 from urllib.request import Request,HTTPRedirectHandler,build_opener,ProxyHandler
 from version import VERSION
 from concurrent.futures import Future
-from run_control import reserve,timeout
+from run_control import reserve,timeout,CURRENT
 from search_queries import render_query
 
 class SearchNotConfigured(ValueError):pass
@@ -105,8 +105,11 @@ class WebSearch:
     def search_terms(self,terms):
         if not isinstance(terms,list) or not 1<=len(terms)<=4 or any(not isinstance(t,str) or not t.strip() or len(t)>2000 or any(ord(c)<32 for c in t) for t in terms) or sum(len(t) for t in terms)>2200:raise ValueError('Invalid context search terms.')
         return self.search('',terms=terms)
+    def result_options(self):
+        control=CURRENT.get()
+        return ((getattr(control,'index_depth',0) or self.brave_result_limit),bool(getattr(control,'extra_snippets',False)))
     def search(self,value,site=None,terms=None):
-        identity=(self.provider,render_query(terms if terms is not None else [str(value)],site).casefold(),self.brave_result_limit if self.provider=='brave' else 10)
+        identity=(self.provider,render_query(terms if terms is not None else [str(value)],site).casefold(),self.result_options() if self.provider=='brave' else (10,False))
         with self.lock:
             future=self.inflight.get(identity);owner=future is None
             if owner:future=Future();self.inflight[identity]=future
@@ -129,9 +132,9 @@ class WebSearch:
             if provider!='mwmbl' and not key:raise SearchNotConfigured('Search provider is not configured. Choose free Mwmbl or add your own key.')
         if provider=='mwmbl':return self._free_search(query,site)
         if provider in ('serper','serpapi'):return self._major_search(provider,key,query,site)
-        depth=self.brave_result_limit
-        source='https://api.search.brave.com/res/v1/web/search?'+urlencode({'q':query,'count':depth,'safesearch':'moderate','text_decorations':'false'})
-        identity=('brave',query.casefold(),site,depth)
+        depth,extra=self.result_options()
+        source='https://api.search.brave.com/res/v1/web/search?'+urlencode({'q':query,'count':depth,'safesearch':'moderate','text_decorations':'false',**({'extra_snippets':'true'} if extra else {})})
+        identity=('brave',query.casefold(),site,depth,extra)
         with self.lock:
             cached=self.cache.get(identity)
             if cached and time.monotonic()-cached[0]<900:
@@ -162,8 +165,15 @@ class WebSearch:
                 if url in seen:excluded['duplicate']+=1;continue
                 seen.add(url)
                 text=lambda x:html.unescape(re.sub('<[^>]+>','',str(x)))
-                rows.append({'title':text(item.get('title','Indexed page'))[:500],'detail':text(item.get('description','No index snippet supplied.'))[:4000], 'reference':url,'index_rank':rank})
-            diagnostics={'provider_rows':len(results),'examined_rows':min(depth,len(results)),'retained_rows':len(rows),'excluded':excluded,'cache_hit':False,'query_mode':'quoted-terms','result_limit':depth}
+                snippets=[text(item.get('description','No index snippet supplied.'))[:4000]]
+                additional=item.get('extra_snippets',[]) if extra else []
+                if isinstance(additional,list):
+                    for snippet in additional[:5]:
+                        if isinstance(snippet,str) and snippet.strip():
+                            snippet=text(snippet)[:2000]
+                            if snippet not in snippets:snippets.append(snippet)
+                rows.append({'title':text(item.get('title','Indexed page'))[:500],'detail':'\n\n'.join(snippets)[:12000], 'reference':url,'index_rank':rank,'observations':{'index_snippets':snippets,'index_only':True}})
+            diagnostics={'provider_rows':len(results),'examined_rows':min(depth,len(results)),'retained_rows':len(rows),'excluded':excluded,'cache_hit':False,'query_mode':'quoted-terms','result_limit':depth,'extra_snippets_requested':extra}
             with self.lock:self.cache[identity]=(time.monotonic(),copy.deepcopy((rows,diagnostics)))
             return IndexResult(source,rows,diagnostics)
         except HTTPError as error:
