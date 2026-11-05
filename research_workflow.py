@@ -12,7 +12,15 @@ def platform_plan(case):
     supplied_platforms={s['platform'] for s in seeds if s}
     supplied_platforms.update(p+'.com' if p!='vsco' else 'vsco.co' for p in ('instagram','tiktok','vsco') if case.get(p))
     sites=[s for s in sites if s not in supplied_platforms]
-    handles=list(dict.fromkeys(case.get('usernames',[])+case.get('instagram',[])+case.get('tiktok',[])+case.get('vsco',[])))
+    # A supplied profile URL is also an explicit handle seed. Restrict this to
+    # reusable public handles: opaque IDs and professional profile slugs are
+    # not cross-platform usernames.
+    handle_platforms={'instagram.com','tiktok.com','vsco.co','twitch.tv','x.com','github.com','gitlab.com','reddit.com','last.fm','wattpad.com'}
+    url_handles=[s['handle'] for s in seeds if s and s['platform'] in handle_platforms]
+    handles=[];seen_handles=set()
+    for handle in case.get('usernames',[])+case.get('instagram',[])+case.get('tiktok',[])+case.get('vsco',[])+url_handles:
+        if handle.casefold() not in seen_handles:
+            handles.append(handle);seen_handles.add(handle.casefold())
     names=list(dict.fromkeys(case.get('names',[])+case.get('spelling_variants',[])))
     choices=[[h] for h in handles[:1]]
     choices += [[n.split()[0],n.split()[-1]] if len(n.split())>1 else [n] for n in names[:1]]

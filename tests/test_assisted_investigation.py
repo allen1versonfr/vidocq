@@ -209,3 +209,30 @@ class AssistedHTTPTests(unittest.TestCase):
                 with req('/api/case-runs/'+run['id']+'/cancel',{}) as r:self.assertFalse(json.load(r)['cancel_requested'])
                 with req('/assisted.js') as r:self.assertEqual(r.status,200)
             finally:server.shutdown();server.server_close();app.DATA,app.CASES,app.CONNECTORS=old_data,old_cases,old_connectors
+
+
+class NameRelevanceConsistencyTests(unittest.TestCase):
+    def test_middle_name_omission_is_a_single_unverified_name_signal(self):
+        from evidence_quality import evidence_gate
+        case={'names':['Ada Byron Lovelace']}
+        row={'title':'Ada Lovelace','detail':'Public author profile','reference':'https://github.com/fixture_author'}
+        self.assertTrue(evidence_gate(row,case)['eligible'])
+        result=relevance(case,row)
+        self.assertEqual(len(result['matched_identifiers']),1)
+        self.assertFalse(result['can_expand'])
+        self.assertFalse(result['strong_anchor'])
+
+    def test_approved_spellings_do_not_inflate_corroboration(self):
+        case={'names':['Example Person'],'spelling_variants':['Example Persson']}
+        row={'title':'Example Person / Example Persson','reference':'https://github.com/fixture_author'}
+        self.assertEqual(len(relevance(case,row)['matched_identifiers']),1)
+        self.assertFalse(relevance(case,row)['can_expand'])
+        row['title']='Example Persson'
+        self.assertEqual(len(relevance(case,row)['matched_identifiers']),1)
+
+    def test_partial_names_and_discovery_pages_do_not_enable_expansion(self):
+        case={'names':['Ada Byron Lovelace']}
+        row={'title':'Ada Lovelaces','reference':'https://github.com/fixture_author'}
+        self.assertFalse(relevance(case,row)['matched_identifiers'])
+        row={'title':'Ada Lovelace','reference':'https://www.tiktok.com/discover/fixture'}
+        self.assertFalse(relevance(case,row)['can_expand'])
