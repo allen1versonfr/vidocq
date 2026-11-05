@@ -1,3 +1,7 @@
+# 2.20.0 — Deeper retrieval and evidence recovery
+
+Adds case-local Brave depth/extra excerpts, cited account-link retention, opt-in indexed bio-link followups, exact evidence windows, structured public bio links, historical reference/successor queries, a simple alias form, read-only miss diagnostics, bounded adapter reference traces and test-contamination checks. See [evidence recovery](docs/EVIDENCE_RECOVERY.md).
+
 # 2.19.0 — Discovery coverage and evidence relevance
 
 Adds source/relevance gates for AI drafts, name-only warnings, syndicated-excerpt deduplication, effective-query deduplication, bounded platform index coverage, explicit content-author review leads, LinkedIn/Hudl profile references and optional saved 20-result Brave depth. See [discovery improvements](docs/DISCOVERY_QUALITY.md) for behavior, limits and validation.

@@ -160,7 +160,10 @@ def query_plan(case):
         for location in case.get('locations',[]):add([name,location],'supplied location variant')
         if case.get('employer'):add([name,case['employer']],'supplied employer context')
     for value in case.get('usernames',[]):add([value],'supplied username')
-    for item in case.get('aliases',[]):add([item['handle']],'historical alias; current ownership unverified')
+    for item in case.get('aliases',[]):
+        add([item['handle']],'historical alias; current ownership unverified')
+        if item.get('reference'):add([item['reference']],'supplied historical evidence reference')
+        if item.get('successor'):add([item['successor']],'supplied successor reference; continuity unverified')
     for value in case.get('urls',[]):add([value],'exact supplied reference URL')
     return plan
 

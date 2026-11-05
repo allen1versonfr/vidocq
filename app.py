@@ -533,6 +533,9 @@ class Handler(BaseHTTPRequestHandler):
                 with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(lambda x:run_adapter(*x),probes))
                 return self.send(200,{'probes':results,'web_search':WEB_SEARCH.status(),'notice':'Public canary queries only; no case identifiers were sent.'})
             if self.path=='/api/search-connection':return self.send(200,AUTOMATION.search(p))
+            if self.path=='/api/benchmark-diagnosis':
+                from benchmark_diagnostics import diagnose_misses
+                return self.send(200,diagnose_misses(CASES.run(p.get('run_id')),p.get('answer_sheet')))
             if self.path=='/api/phone':
                 from phone_lookup import inspect_phone
                 return self.send(200,inspect_phone(p.get('value',''),p.get('region','US')))

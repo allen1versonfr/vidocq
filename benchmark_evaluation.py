@@ -2,7 +2,7 @@
 from datetime import date
 import hashlib,json,re
 from urllib.parse import urlparse
-from profile_registry import account_identity,parsed_public
+from profile_registry import account_identity,parsed_public,supplied_profiles
 
 ROLES={'seed','withheld','previously-confirmed','supplied-handle-control','negative'}
 
@@ -54,14 +54,17 @@ def evaluate(report,sheet):
     if report.get('status') not in ('complete','cancelled','interrupted','failed'):raise ValueError('Seal the blind report before scoring or running controls.')
     records=report.get('records',[])
     if not isinstance(records,list) or any(not isinstance(r,dict) for r in records):raise ValueError('Invalid sealed report records.')
-    matched={};eligible=[];excluded=[];all_known=set()
+    matched={};matched_rows={};eligible=[];excluded=[];all_known=set();contaminated=[]
+    supplied={reference_key(ref) for ref in supplied_profiles(report.get('case',{}))}
     for row in key['accounts']:
         if row.get('exclude_reason'):excluded.append(row['id']);continue
         case_sensitive=row.get('case_sensitive',row.get('platform')=='Spotify')
         expected={reference_key(v,case_sensitive) for v in [row['canonical_url']]+row.get('reference_variants',[])}
         expected.discard(None);all_known.update(reference_key(v) for v in [row['canonical_url']]+row.get('reference_variants',[]))
+        if row['role']=='withheld' and any(reference_key(v) in supplied for v in [row['canonical_url']]+row.get('reference_variants',[])):
+            contaminated.append(row['id']);excluded.append(row['id']);continue
         found=[r for r in records if r.get('analyst_status')!='Rejected' and reference_key(r.get('reference',''),case_sensitive) in expected]
-        if found:matched[row['id']]=[r.get('id') for r in found]
+        if found:matched[row['id']]=[r.get('id') for r in found];matched_rows[row['id']]=found
         if row['eligible'] and row['role']=='withheld':eligible.append(row['id'])
     new=[r['id'] for r in key['accounts'] if r['role']=='withheld' and r['id'] in matched]
     negatives=[r['id'] for r in key['accounts'] if r['role']=='negative' and r['id'] in matched]
@@ -75,17 +78,19 @@ def evaluate(report,sheet):
         elif row['ownership']=='confirmed' and row['role']!='negative':confirmed_positive.update(refs)
     new_candidates=candidates-seeds;right=len(new_candidates&confirmed_positive);wrong=len(new_candidates&confirmed_negative)
     unresolved=len(new_candidates-confirmed_positive-confirmed_negative)
-    return {'key_sha256':key['key_sha256'],'report_sha256':hashlib.sha256(json.dumps(report,sort_keys=True).encode()).hexdigest(),'new_known_list_matches':new,'matched_citations':matched,
+    linked=[key for key,rows in matched_rows.items() if all(r.get('origin')=='explicit-linked-profile' for r in rows)]
+    return {'key_sha256':key['key_sha256'],'report_sha256':hashlib.sha256(json.dumps(report,sort_keys=True).encode()).hexdigest(),'new_known_list_matches':new,'matched_citations':matched,'linked_review_matches':[i for i in new if i in linked],'retrieved_known_list_matches':[i for i in new if i not in linked],'blind_score_valid':not contaminated,'withheld_urls_supplied_as_clues':contaminated,
             'seed_rediscoveries':[r['id'] for r in key['accounts'] if r['role']=='seed' and r['id'] in matched],
             'prior_rediscoveries':[r['id'] for r in key['accounts'] if r['role']=='previously-confirmed' and r['id'] in matched],
-            'negative_matches':negatives,'eligible_withheld':len(eligible),'eligible_found':len(eligible_found),'public_account_recall':len(eligible_found)/len(eligible) if eligible else None,
+            'negative_matches':negatives,'eligible_withheld':len(eligible),'eligible_found':len(eligible_found),'public_account_recall':len(eligible_found)/len(eligible) if eligible and not contaminated else None,
             'unresolved_candidate_profiles':unresolved,'resolved_candidate_precision':right/(right+wrong) if right+wrong else None,'resolved_correct':right,'resolved_wrong':wrong,'excluded_ids':excluded,'warnings':key['warnings'],
             'notice':'Known-list matches are not independently verified discoveries. Precision requires ownership labels for every resolved candidate; unresolved candidates remain separate.'}
 
 def compare_conditions(conditions,sheet):
     fields=('names','usernames','locations','location','urls','aliases','spelling_variants','notes','employer','emails','phones','domains','ips','instagram','tiktok','vsco','steam','notebook_ids')
-    fingerprints=[];results=[]
+    fingerprints=[];evidence_fingerprints=[];results=[]
     for label,report in conditions:
         case=report.get('case',{});fingerprints.append(hashlib.sha256(json.dumps({f:case.get(f) for f in fields},sort_keys=True).encode()).hexdigest())
-        results.append({'condition':label,'score':evaluate(report,sheet),'run_configuration':report.get('research_configuration',{}),'requests':report.get('request_ledger',{})})
-    return {'same_starting_clues':len(set(fingerprints))<=1,'conditions':results,'notice':'Different providers, rank depth, reviewed bios and model modes are different conditions. Use fixed clues and budgets; no score increase is inferred automatically.'}
+        evidence_fingerprints.append(hashlib.sha256(json.dumps(report.get('supplied_findings',[]),sort_keys=True).encode()).hexdigest())
+        results.append({'condition':label,'score':evaluate(report,sheet),'run_configuration':report.get('research_configuration',{}),'index_options':report.get('index_options',{}),'requests':report.get('request_ledger',{})})
+    return {'same_starting_clues':len(set(fingerprints))<=1,'same_supplied_evidence':len(set(evidence_fingerprints))<=1,'conditions':results,'notice':'Different providers, rank depth, reviewed bios and model modes are different conditions. Use fixed clues and budgets; no score increase is inferred automatically.'}

@@ -28,16 +28,15 @@ def source_quality(record):
 def evidence_gate(record,case=None):
     quality=source_quality(record)
     if record.get('analyst_status')=='Rejected':return {'eligible':False,'reason':'Analyst rejected this source.','strength':0}
+    if record.get('assertion_only') or record.get('origin') in ('explicit-linked-profile','derived-public-content'):return {'eligible':False,'reason':'Supplied assertions and generated navigation captions are not independent source evidence; review the parent citation.','strength':0}
     if not quality['usable_for_ai']:return {'eligible':False,'reason':quality['reason'],'strength':0}
     if case is None:return {'eligible':True,'reason':'Provenance filter only; no case context supplied.','strength':1}
     if record.get('analyst_status')=='Confirmed':return {'eligible':True,'reason':'Analyst-confirmed evidence; retain source citations.','strength':4}
     def norm(s):return ' '.join(unicodedata.normalize('NFKC',str(s)).casefold().split())
     blob=norm(record.get('title','')+'\n'+record.get('detail','')+'\n'+record.get('reference',''))
     def match(v):return bool(v and re.search(r'(?<!\w)'+re.escape(norm(v).lstrip('@'))+r'(?!\w)',blob))
-    supplied=list(case.get('urls',[]))+list(case.get('steam',[]))
-    from social_profiles import profile_reference
-    supplied += [profile_reference(p,h) for p in ('instagram','tiktok','vsco') for h in case.get(p,[])]
-    try:anchor=canonical_reference(record.get('reference','')) in {canonical_reference(v) for v in supplied}
+    from profile_registry import supplied_profiles
+    try:anchor=canonical_reference(record.get('reference','')) in supplied_profiles(case)
     except ValueError:anchor=False
     handle=any(match(v) for f in ('usernames','instagram','tiktok','vsco','emails') for v in case.get(f,[]))
     name=any(match(v) or (len(v.split())>2 and match(v.split()[0]+' '+v.split()[-1])) for v in case.get('names',[])+case.get('spelling_variants',[]))
@@ -61,3 +60,18 @@ def ranked_ai_records(records,case=None):
         if len(text)>=60:seen_text.add(text)
         result.append(record)
     return result
+
+def evidence_excerpt(record,case,maximum=1500):
+    """Keep one exact contiguous source window near supplied identifiers."""
+    text=record.get('detail','');identifiers=[]
+    for field in ('names','spelling_variants','usernames','instagram','tiktok','vsco','emails'):
+        identifiers.extend(case.get(field,[]))
+    identifiers += [n.split()[0]+' '+n.split()[-1] for n in case.get('names',[]) if len(n.split())>2]
+    positions=[]
+    for value in identifiers:
+        pattern=r'(?<!\w)'+r'\s+'.join(re.escape(v) for v in value.lstrip('@').split())+r'(?!\w)'
+        match=re.search(pattern,text,re.IGNORECASE)
+        if match:positions.append(match.start())
+    start=max(0,min(positions)-200) if positions else 0
+    start=min(start,max(0,len(text)-maximum));end=min(len(text),start+maximum)
+    return {'text':text[start:end],'start':start,'end':end}

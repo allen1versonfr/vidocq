@@ -2,7 +2,7 @@
   <img src="docs/assets/vidocq-banner.svg" alt="Vidocq — Follow the evidence. Public indexes, local workspace." width="100%">
 </p>
 
-**2.19.0 discovery update:** [Thirteen improvements to search coverage and evidence relevance](docs/DISCOVERY_QUALITY.md). [Earlier audit fixes and validation limits](docs/AUDIT_FIXES.md).
+**2.20.0 evidence recovery:** [Deeper results, cited profile links, historical evidence and offline miss diagnosis](docs/EVIDENCE_RECOVERY.md). [Earlier discovery improvements](docs/DISCOVERY_QUALITY.md) · [Audit fixes](docs/AUDIT_FIXES.md).
 
 <p align="center">
   <strong>A portable research workspace for Windows.</strong><br>

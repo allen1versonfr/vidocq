@@ -1,3 +1,13 @@
+# Validation for Vidocq 2.20.0
+
+The 351-test suite passes locally with one Windows symlink-capability skip. New fixtures verify case-scoped Brave depth/extra excerpts without saved-connection mutation, depth/snippet cache separation, exact offset windows around late identifiers, indexed profile-link opt-in/caps, retained link-only leads at zero followup budget, punctuation-safe public bio extraction, matching-Person structured sameAs links, historical evidence/successor queries and supplied-account roles. Read-only diagnosis tests cover adapter reference loss, cited links, controls that use a different query, deeper same-query control ranks, unsupported profile shapes, sealed-file verification and no provider/key writes. Scoring tests reject withheld credit for supplied note/successor URLs and distinguish changed reviewed evidence. DOM fixtures exercise new case defaults and alias entry.
+
+A real local Qwen synthetic run returned valid outputs for planning, link abstention, source extraction and finite next actions. One selected quotation contained a supplied name beyond the former initial evidence slice; window offsets were recorded. This validates the contract, not investigative accuracy. Windows release gates exercise case depth/snippet metadata, cited-link retention and offline diagnosis against the actual executable, including unchanged sealed reports and existing restart/rollback/cleanup checks.
+
+No new paid/private-person investigation or fresh discovery score was measured. Private benchmark files are excluded from GitHub. Native visual/browser testing and live operator Instagram authentication remain outside this validation.
+
+Previous validation:
+
 # Validation for Vidocq 2.19.0
 
 329 Python tests pass locally (one Windows symlink-capability skip). New synthetic tests verify unsuitable-source exclusion, complete-identifier gating and no-call abstention, supplied-profile anchors, possible-namesake labels on quotations, richer-resource and syndicated-excerpt deduplication, effective-query normalization, bounded platform-index fallback, zero-limit behavior, content-author parent citations and strict LinkedIn/Hudl profile shapes. Optional Brave depth fixtures retain ranks through 20, distinguish depth caches, and restore saved depth across setup instances. DOM fixtures cover platform/depth controls.

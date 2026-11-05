@@ -1,3 +1,17 @@
+# Vidocq 2.20.0
+
+New interface-created cases select 20 Brave results, with an option to use the connection setting or 10. Existing cases retain their settings. Optional extra Brave excerpts preserve more indexed context without fetching original pages; per-case depth/snippet choices have separate caches and do not change saved connections. Search/request/deadline limits still apply.
+
+Cited profile URLs survive as unverified review leads even when approved followups return nothing or have no remaining followup budget. Optional index-snippet link following is limited to explicit account URLs from supplied/reviewed profiles. Excerpt windows retain verbatim evidence near late identifiers. Public metadata capture prioritizes bio URLs and sameAs links from a Person node matching the approved source URL, while keeping page anchors separate.
+
+A simple historical-alias form supplies dated evidence and successor references to the bounded plan; no aliases or continuity are inferred. Review plans preserve platform scopes. Read-only GUI/CLI miss diagnosis separates original adapter loss, unmaterialized links, rejections, absent returned references and separately saved post-test controls. It makes no provider calls and never changes discovery credit. Explicit account URLs already in starting notes/alias assertions cannot earn withheld credit, and linked review leads remain distinct from index-returned matches.
+
+Validation: 351-test suite passes locally (one Windows symlink-capability skip), including cache/context isolation, link provenance/limits, structured bio matching, exact windows, sealed input preservation, read-only API behavior and blind-key contamination checks. DOM case/alias fixtures pass. Real local Qwen synthetic planning, abstention, cited extraction near a late identifier and finite next-action outputs returned valid results. Packaged Windows gates verify the new options/diagnostic and repeat update, rollback and cleanup checks.
+
+Private test data stays excluded. No fresh paid/private-person test ran for this release and no discovery-score improvement is claimed. Native visual QA and live operator Instagram login remain unvalidated. See docs/EVIDENCE_RECOVERY.md for controls and limits.
+
+Previous release:
+
 # Vidocq 2.19.0
 
 Thirteen changes target discovery coverage and evidence quality. Directory/property listings no longer enter model evidence or automatic clue expansion; raw records remain reviewable. Model context must match supplied identifiers, complete names, account references or analyst-confirmed evidence. Name-only quotation drafts warn about namesakes, and syndicated identical excerpts cannot fill multiple context slots.

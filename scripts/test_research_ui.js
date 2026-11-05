@@ -15,6 +15,7 @@ w.fetch=async(url,options={})=>{
   else if(url==='/api/instagram-login/code'){authPhase='connected';data=auth()}
   else if(url==='/api/cases/'+cid+'/review-plan')data={previous_run:rid,queries:[{terms:['Example','Person'],reason:'supplied tokens',previously_attempted:false}],next_steps:['Review public bio'],source_gaps:{status:'incomplete'}};
   else if(url==='/api/cases/'+cid+'/profile-capture')data={result:{},evidence:{id:'fixture'}};
+  else if(url==='/api/cases/'+cid+'/aliases')data={aliases:p.aliases};
   else if(url==='/api/cases/'+cid+'/continue')data={id:newRid};
   else return new Promise(()=>{}); // unrelated startup reads stay offline/pending
   return {ok:true,json:async()=>data};
@@ -37,6 +38,8 @@ async function flush(){for(let i=0;i<12;i++)await Promise.resolve()}
   await el('connection-form').onsubmit(event);assert.equal(calls.filter(c=>c.url==='/api/search-connection'&&c.p?.provider==='mwmbl').at(-1).p.key,undefined);
   el('case-title').value='Synthetic case';const payload=vm.runInContext('casePayload()',context);assert.equal(payload.investigation.adaptive_queries,true);assert.equal(payload.investigation.ai_assessment,true);
   assert.equal(payload.investigation.platform_searches,4);assert.equal(el('search-result-limit').value,'10');
+  assert.equal(payload.investigation.index_depth,20);assert.equal(payload.investigation.extra_snippets,false);assert.equal(payload.investigation.follow_indexed_links,false);
+  el('alias-entry-handle').value='oldfixture';el('alias-entry-successor').value='https://instagram.com/newfixture';await el('alias-entry-save').onclick();assert.equal(el('alias-entry-handle').value,'');assert(calls.some(c=>c.url.endsWith('/aliases')&&c.p.aliases[0].successor==='https://instagram.com/newfixture'));
   await el('workflow-plan').onclick();assert.match(el('workflow-queries').textContent,/Example/);
   el('profile-reference').value='https://github.com/publicfixture';el('profile-biography').value='Reviewed public biography';el('profile-reviewed').checked=true;
   el('profile-evidence-form').onsubmit(event);await flush();assert(calls.some(c=>c.url.endsWith('/profile-capture')&&c.p.public_reviewed===true));

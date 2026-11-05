@@ -25,7 +25,7 @@ def check(request,root):
     state=get('/api/search-connection',{'provider':'serper','key':'synthetic-frozen-search-key','enabled':False,'remember':True,'session_limit':3})
     assert state['provider']=='serper' and not state['enabled'] and 'synthetic-frozen-search-key' not in json.dumps(state)
     raw=(root/'data/credentials.dpapi').read_bytes();assert b'synthetic-frozen-session-secret' not in raw and b'synthetic-frozen-search-key' not in raw
-    case=get('/api/cases',{'title':'Synthetic guided workflow','names':['Example Person'],'usernames':['publicfixture'],'investigation':{'enabled':True,'allow_maigret':False,'max_searches':8}})
+    case=get('/api/cases',{'title':'Synthetic guided workflow','names':['Example Person'],'usernames':['publicfixture'],'investigation':{'enabled':True,'allow_maigret':False,'max_searches':8,'index_depth':20,'extra_snippets':True,'follow_indexed_links':True,'follow_published_links':True}})
     def run(path,p):
         started=get(path,p);deadline=time.monotonic()+30
         while True:
@@ -33,6 +33,7 @@ def check(request,root):
             if report['status']=='complete':return report
             assert report['status'] in ('queued','running') and time.monotonic()<deadline;time.sleep(.1)
     first=run('/api/cases/'+case['id']+'/run',{'consent':True});original=json.dumps(first,sort_keys=True)
+    assert first['index_options']['brave_depth']==20 and first['request_ledger']['requested_index_depth']==20 and first['request_ledger']['extra_snippets']
     path='/api/cases/'+case['id'];plan=get(path+'/review-plan',{});assert plan['previous_run']==first['id'] and plan['queries']
     payload={'consent':True,'public_reviewed':True,'reference':'https://github.com/publicfixture','display_name':'Example Person','handle':'publicfixture','stable_id':'1234','biography':'Public fixture bio links https://gitlab.com/linkedfixture','links':['https://gitlab.com/linkedfixture']}
     assert get(path+'/profile-capture',payload)['result']['profile']['stable_id']=='1234'
@@ -41,6 +42,11 @@ def check(request,root):
     rejected(path+'/continue',{'previous_run':first['id'],'consent':False})
     second=run(path+'/continue',{'previous_run':first['id'],'consent':True})
     assert second['continued_from']==first['id'] and second['profile_graph']['nodes'] and second['link_evidence']
+    assert any(r.get('origin')=='explicit-linked-profile' and r['reference']=='https://gitlab.com/linkedfixture' for r in second['records'])
+    sealed_second=json.dumps(second,sort_keys=True)
+    diagnosis=get('/api/benchmark-diagnosis',{'run_id':second['id'],'answer_sheet':{'accounts':[{'id':'fixture-link','role':'withheld','canonical_url':'https://gitlab.com/linkedfixture'}]}})
+    assert diagnosis['network_requests']==0 and not diagnosis['discovery_score_changed'] and diagnosis['accounts'][0]['stage']=='returned-linked-review-lead'
+    assert json.dumps(get('/api/case-runs/'+second['id']),sort_keys=True)==sealed_second
     assert json.dumps(get('/api/case-runs/'+first['id']),sort_keys=True)==original
     get('/api/automation',{'consent':True});wait_setup();vault.invalidate_instagram()
     get('/api/automation',{'consent':True,'osintgram':True});wait_setup()
